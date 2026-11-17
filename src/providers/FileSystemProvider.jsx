@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useHistory } from './HistoryProvider';
 import { useSettings } from './SettingsProvider';
 import { useSftp } from './SftpProvider';
 import { getDirectoryPath } from '../utils/pathUtils';
+import { t } from '../i18n';
 
 // Create file system context
 const FileSystemContext = createContext({
@@ -36,6 +38,8 @@ export default function FileSystemProvider({ children }) {
     const [volumes, setVolumes] = useState([]);
     const [error, setError] = useState(null);
     const { navigateTo, currentPath } = useHistory();
+    // Path whose contents are currently shown; prevents loading the same folder twice
+    const lastLoadedPathRef = useRef(null);
     const { settings } = useSettings();
     const { 
         isSftpPath, 
@@ -84,22 +88,10 @@ export default function FileSystemProvider({ children }) {
             return volumesData; // Zurückgeben zur weiteren Verwendung
         } catch (err) {
             console.error('Failed to load volumes:', err);
-            setError(`Failed to load volumes: ${err.message || err}`);
-            // Fallback to mock data for development
-            const mockVolumes = [
-                {
-                    volume_name: "Local Disk (C:)",
-                    mount_point: "C:\\",
-                    file_system: "NTFS",
-                    size: 500107862016,
-                    available_space: 158148874240,
-                    is_removable: false,
-                    total_written_bytes: 0,
-                    total_read_bytes: 0
-                }
-            ];
-            setVolumes(mockVolumes);
-            return mockVolumes;
+            setError(t('Failed to load volumes: {error}', { error: err.message || err }));
+            // No fake volumes: show an empty list instead of a non-existent "C:\\" disk
+            setVolumes([]);
+            return [];
         }
     }, []);
 
@@ -123,17 +115,17 @@ export default function FileSystemProvider({ children }) {
                 if (sftpData) {
                     const filteredData = filterDirectoryData(sftpData);
                     setCurrentDirData(filteredData);
+                    lastLoadedPathRef.current = path;
                     navigateTo(path);
-                    console.log(`Successfully loaded SFTP directory: ${path}`);
                     return true;
                 } else {
-                    throw new Error('Failed to load SFTP directory');
+                    throw new Error(t('Failed to load SFTP directory'));
                 }
             }
 
             // Regular file system path
             const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error(`Directory loading timed out: ${path}`)), 10000);
+                setTimeout(() => reject(new Error(t('Directory loading timed out: {path}', { path }))), 10000);
             });
 
             const loadPromise = invoke('open_directory', { path });
@@ -147,8 +139,10 @@ export default function FileSystemProvider({ children }) {
                 const dirData = JSON.parse(dirContent);
                 const filteredData = filterDirectoryData(dirData);
                 setCurrentDirData(filteredData);
+                lastLoadedPathRef.current = path;
                 navigateTo(path);
-                console.log(`Successfully loaded directory: ${path}`);
+                // Live refresh when the folder changes on disk
+                invoke('watch_directory', { path }).catch(() => {});
                 return true;
             } catch (parseError) {
                 throw new Error(`Failed to parse directory data: ${parseError.message}`);
@@ -165,12 +159,12 @@ export default function FileSystemProvider({ children }) {
                 );
                 
                 if (isUserDir) {
-                    setError(`Access denied to "${folderName}". This app needs permission to access your ${folderName} folder. Please grant permission in System Preferences > Security & Privacy > Privacy > Files and Folders.`);
+                    setError(t('Access denied to "{name}". This app needs permission to access your {name} folder. Please grant permission in System Preferences > Security & Privacy > Privacy > Files and Folders.', { name: folderName }));
                 } else {
-                    setError(`Permission denied: Cannot access "${folderName}". You may need to grant additional permissions to this application.`);
+                    setError(t('Permission denied: Cannot access "{name}". You may need to grant additional permissions to this application.', { name: folderName }));
                 }
             } else {
-                setError(`Failed to load directory: ${errorMessage}`);
+                setError(t('Failed to load directory: {error}', { error: errorMessage }));
             }
             return false;
         } finally {
@@ -235,7 +229,7 @@ export default function FileSystemProvider({ children }) {
         let timeoutId = setTimeout(() => {
             console.error("Directory initialization timed out");
             setIsLoading(false);
-            setError("Failed to initialize directory within the time limit");
+            setError(t('Failed to initialize directory within the time limit'));
         }, 10000);
 
         try {
@@ -264,7 +258,7 @@ export default function FileSystemProvider({ children }) {
             }
         } catch (err) {
             console.error('Failed to initialize directory:', err);
-            setError('Failed to load any directory. Please check file system permissions.');
+            setError(t('Failed to load any directory. Please check file system permissions.'));
         } finally {
             // Cleanup Timeout und stelle sicher, dass der Ladezustand beendet wird
             clearTimeout(timeoutId);
@@ -283,10 +277,10 @@ export default function FileSystemProvider({ children }) {
         }
     }, [initializeFirstDirectory, currentDirData, currentPath]);
 
-// Reagiere auf Navigation/currentPath Änderungen
+    // Load the folder when the path changes from outside (back/forward, tabs).
+    // Skipped when loadDirectory itself just loaded this path.
     useEffect(() => {
-        if (currentPath) {
-            console.log(`Current path changed to: ${currentPath}, loading directory...`);
+        if (currentPath && currentPath !== lastLoadedPathRef.current) {
             loadDirectory(currentPath);
         }
     }, [currentPath, loadDirectory]);
@@ -306,7 +300,7 @@ export default function FileSystemProvider({ children }) {
             }
         } catch (err) {
             console.error(`Failed to open file: ${filePath}`, err);
-            setError(`Failed to open file: ${err.message || err}`);
+            setError(t('Failed to open file: {error}', { error: err.message || err }));
         } finally {
             setIsLoading(false);
         }
@@ -332,7 +326,7 @@ export default function FileSystemProvider({ children }) {
             }
         } catch (err) {
             console.error(`Failed to create file: ${fileName}`, err);
-            setError(`Failed to create file: ${err.message || err}`);
+            setError(t('Failed to create file: {error}', { error: err.message || err }));
         } finally {
             setIsLoading(false);
         }
@@ -358,7 +352,7 @@ export default function FileSystemProvider({ children }) {
             }
         } catch (err) {
             console.error(`Failed to create directory: ${directoryName}`, err);
-            setError(`Failed to create directory: ${err.message || err}`);
+            setError(t('Failed to create directory: {error}', { error: err.message || err }));
         } finally {
             setIsLoading(false);
         }
@@ -391,7 +385,7 @@ export default function FileSystemProvider({ children }) {
             console.log('FileSystemProvider: Rename operation completed successfully');
         } catch (err) {
             console.error(`Failed to rename item: ${oldPath}`, err);
-            setError(`Failed to rename item: ${err.message || err}`);
+            setError(t('Failed to rename item: {error}', { error: err.message || err }));
         } finally {
             setIsLoading(false);
         }
@@ -422,7 +416,7 @@ export default function FileSystemProvider({ children }) {
             }
         } catch (err) {
             console.error(`Failed to move item to trash: ${path}`, err);
-            setError(`Failed to move item to trash: ${err.message || err}`);
+            setError(t('Failed to move item to trash: {error}', { error: err.message || err }));
         } finally {
             setIsLoading(false);
         }
@@ -445,7 +439,7 @@ export default function FileSystemProvider({ children }) {
             }
         } catch (err) {
             console.error('Failed to create zip:', err);
-            setError(`Failed to create zip: ${err.message || err}`);
+            setError(t('Failed to create zip: {error}', { error: err.message || err }));
         } finally {
             setIsLoading(false);
         }
@@ -468,7 +462,7 @@ export default function FileSystemProvider({ children }) {
             }
         } catch (err) {
             console.error(`Failed to extract zip: ${zipPath}`, err);
-            setError(`Failed to extract zip: ${err.message || err}`);
+            setError(t('Failed to extract zip: {error}', { error: err.message || err }));
         } finally {
             setIsLoading(false);
         }
@@ -515,21 +509,50 @@ export default function FileSystemProvider({ children }) {
         loadVolumes();
     }, [loadVolumes]);
 
-    // Reload current directory when navigating back/forward
-    useEffect(() => {
-        if (currentPath) {
-            loadDirectory(currentPath);
+    /**
+     * Re-reads the open folder without a loading state, keeping the selection
+     * (minus items that no longer exist). Used for live refresh.
+     */
+    const refreshDirectory = useCallback(async () => {
+        const path = lastLoadedPathRef.current;
+        if (!path || isSftpPath(path)) return;
+        try {
+            const json = await invoke('open_directory', { path });
+            if (lastLoadedPathRef.current !== path) return; // navigated away meanwhile
+            const data = filterDirectoryData(JSON.parse(json));
+            setCurrentDirData(data);
+            const existing = new Set([...(data.directories || []), ...(data.files || [])].map(i => i.path));
+            setSelectedItems(prev => prev.filter(i => existing.has(i.path)));
+        } catch (err) {
+            console.warn('Live refresh failed:', err);
         }
-    }, [currentPath, loadDirectory]);
+    }, [filterDirectoryData, isSftpPath]);
 
-    // Reload current directory when hidden files setting changes
+    // Folder changed on disk -> refresh it
     useEffect(() => {
-        if (currentPath) {
-            loadDirectory(currentPath);
-        }
-    }, [settings.show_hidden_files_and_folders, currentPath, loadDirectory]);
+        let unlisten = null;
+        let disposed = false;
+        listen('directory-changed', (event) => {
+            if (event.payload === lastLoadedPathRef.current) refreshDirectory();
+        }).then((fn) => {
+            if (disposed) fn(); else unlisten = fn;
+        }).catch(() => {});
+        return () => {
+            disposed = true;
+            if (unlisten) unlisten();
+        };
+    }, [refreshDirectory]);
+
+    // Re-filter when the "show hidden files" setting changes (not on every navigation)
+    const hiddenSettingRef = useRef(settings.show_hidden_files_and_folders);
+    useEffect(() => {
+        if (hiddenSettingRef.current === settings.show_hidden_files_and_folders) return;
+        hiddenSettingRef.current = settings.show_hidden_files_and_folders;
+        refreshDirectory();
+    }, [settings.show_hidden_files_and_folders, refreshDirectory]);
 
     const contextValue = {
+        refreshDirectory,
         currentDirData,
         isLoading,
         selectedItems,

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { t } from '../i18n';
 
 // Default settings - using exact backend keys and supported values
 const defaultSettings = {
@@ -95,7 +96,7 @@ export default function SettingsProvider({ children }) {
             console.log('Settings loaded successfully');
         } catch (error) {
             console.error('Failed to load settings:', error);
-            setError('Failed to load settings from backend');
+            setError(t('Failed to load settings from backend'));
 
             // Use default settings if loading fails
             setSettings(defaultSettings);
@@ -109,7 +110,7 @@ export default function SettingsProvider({ children }) {
                 console.log('Default settings saved successfully');
             } catch (saveError) {
                 console.error('Failed to save default settings:', saveError);
-                setError('Failed to load and save default settings');
+                setError(t('Failed to load and save default settings'));
             }
         } finally {
             setIsLoading(false);
@@ -147,7 +148,7 @@ export default function SettingsProvider({ children }) {
             console.log(`Setting ${key} updated successfully`);
         } catch (error) {
             console.error(`Failed to update setting ${key}:`, error);
-            setError(`Failed to update ${key}: ${error.message || error}`);
+            setError(t('Failed to update {key}: {error}', { key, error: error.message || error }));
 
             // Update local state anyway for better UX, but show the error
             setSettings(prev => ({
@@ -185,7 +186,7 @@ export default function SettingsProvider({ children }) {
             console.log('Multiple settings updated successfully');
         } catch (error) {
             console.error('Failed to update multiple settings:', error);
-            setError(`Failed to update settings: ${error.message || error}`);
+            setError(t('Failed to update settings: {error}', { error: error.message || error }));
 
             // Update local state anyway for better UX, but show the error
             setSettings(prev => ({
@@ -212,7 +213,7 @@ export default function SettingsProvider({ children }) {
             console.log('Settings reset successfully');
         } catch (error) {
             console.error('Failed to reset settings:', error);
-            setError(`Failed to reset settings: ${error.message || error}`);
+            setError(t('Failed to reset settings: {error}', { error: error.message || error }));
 
             // Update local state anyway for better UX, but show the error
             setSettings(defaultSettings);
@@ -260,7 +261,7 @@ export default function SettingsProvider({ children }) {
                     color: '#6b7280',
                     fontSize: '14px'
                 }}>
-                    Loading settings...
+                    {t('Loading settings...')}
                 </div>
                 <style>{`
                     @keyframes spin {

@@ -3,6 +3,7 @@ import { useFileSystem } from '../../providers/FileSystemProvider';
 import { useHistory } from '../../providers/HistoryProvider';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
+import { useI18n } from '../../i18n';
 import './createFileButton.css';
 
 /**
@@ -20,6 +21,7 @@ const CreateFileButton = () => {
 
     const { createFile, createDirectory } = useFileSystem();
     const { currentPath } = useHistory();
+    const { t } = useI18n();
 
     /**
      * Sets up event listeners for custom create events
@@ -88,7 +90,7 @@ const CreateFileButton = () => {
      * @returns {string} Default name for the item
      */
     const getDefaultName = (type) => {
-        return type === 'file' ? 'New File.txt' : 'New Folder';
+        return type === 'file' ? t('New File.txt') : t('New Folder');
     };
 
     /**
@@ -120,7 +122,7 @@ const CreateFileButton = () => {
             // Check for specific error types
             if (error.message && error.message.includes('already exists')) {
                 const shouldCreateCopy = confirm(
-                    `An item named "${itemName}" already exists. Would you like to create a copy instead?`
+                    t('An item named "{name}" already exists. Would you like to create a copy instead?', { name: itemName })
                 );
 
                 if (shouldCreateCopy) {
@@ -131,7 +133,9 @@ const CreateFileButton = () => {
                     return; // Don't close modal, let user try again
                 }
             } else {
-                alert(`Failed to create ${creationType}: ${error.message || error}`);
+                alert(creationType === 'file'
+                    ? t('Failed to create file: {error}', { error: error.message || error })
+                    : t('Failed to create folder: {error}', { error: error.message || error }));
             }
         }
     };
@@ -171,12 +175,12 @@ const CreateFileButton = () => {
                 <button
                     className="create-button"
                     onClick={toggleDropdown}
-                    aria-label="Create new item"
+                    aria-label={t('Create new item')}
                     aria-expanded={isDropdownOpen}
                     aria-haspopup="true"
                 >
                     <span className="icon icon-plus"></span>
-                    <span>New</span>
+                    <span>{t('New')}</span>
                     <span className="icon icon-chevron-down"></span>
                 </button>
 
@@ -189,7 +193,7 @@ const CreateFileButton = () => {
                                     onClick={() => handleOptionClick('file')}
                                 >
                                     <span className="icon icon-file"></span>
-                                    <span>Text File</span>
+                                    <span>{t('Text File')}</span>
                                     <span className="shortcut">Ctrl+N</span>
                                 </button>
                             </li>
@@ -199,7 +203,7 @@ const CreateFileButton = () => {
                                     onClick={() => handleOptionClick('folder')}
                                 >
                                     <span className="icon icon-folder"></span>
-                                    <span>Folder</span>
+                                    <span>{t('Folder')}</span>
                                     <span className="shortcut">Ctrl+Shift+N</span>
                                 </button>
                             </li>
@@ -214,7 +218,7 @@ const CreateFileButton = () => {
                                     }}
                                 >
                                     <span className="icon icon-template"></span>
-                                    <span>From Template...</span>
+                                    <span>{t('From Template...')}</span>
                                 </button>
                             </li>
                         </ul>
@@ -225,7 +229,7 @@ const CreateFileButton = () => {
             <Modal
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
-                title={`Create New ${creationType === 'file' ? 'File' : 'Folder'}`}
+                title={creationType === 'file' ? t('Create New File') : t('Create New Folder')}
                 size="sm"
                 footer={
                     <>
@@ -233,7 +237,7 @@ const CreateFileButton = () => {
                             variant="ghost"
                             onClick={() => setIsCreateModalOpen(false)}
                         >
-                            Cancel
+                            {t('Cancel')}
                         </Button>
                         <Button
                             type="submit"
@@ -241,7 +245,7 @@ const CreateFileButton = () => {
                             disabled={!itemName.trim()}
                             onClick={handleCreate}
                         >
-                            Create
+                            {t('Create')}
                         </Button>
                     </>
                 }
@@ -249,7 +253,7 @@ const CreateFileButton = () => {
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
                         <label htmlFor="item-name">
-                            {creationType === 'file' ? 'File name:' : 'Folder name:'}
+                            {creationType === 'file' ? t('File name:') : t('Folder name:')}
                         </label>
                         <input
                             ref={inputRef}
@@ -258,12 +262,12 @@ const CreateFileButton = () => {
                             value={itemName}
                             onChange={handleNameChange}
                             className="input"
-                            placeholder={`Enter ${creationType} name`}
+                            placeholder={creationType === 'file' ? t('Enter file name') : t('Enter folder name')}
                         />
                         <div className="input-hint">
                             {creationType === 'file'
-                                ? 'Include the file extension (e.g., .txt, .md, .json)'
-                                : 'Choose a descriptive name for your folder'
+                                ? t('Include the file extension (e.g., .txt, .md, .json)')
+                                : t('Choose a descriptive name for your folder')
                             }
                         </div>
                     </div>

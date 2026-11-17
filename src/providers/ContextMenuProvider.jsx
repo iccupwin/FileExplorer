@@ -4,6 +4,7 @@ import { useFileSystem } from './FileSystemProvider';
 import { useHistory } from './HistoryProvider';
 import { useSftp } from './SftpProvider';
 import { showNotification, showError, showSuccess, showConfirm } from '../utils/NotificationSystem';
+import { t, plural, PLURALS } from '../i18n';
 
 const ContextMenuContext = createContext({
     isOpen: false,
@@ -46,7 +47,7 @@ export default function ContextMenuProvider({ children }) {
             // Check if already in favorites
             const alreadyExists = existingFavorites.some(fav => fav.path === item.path);
             if (alreadyExists) {
-                showNotification('This item is already in your favorites.');
+                showNotification(t('This item is already in your favorites.'));
                 return;
             }
 
@@ -66,10 +67,10 @@ export default function ContextMenuProvider({ children }) {
                 newValue: JSON.stringify(updatedFavorites)
             }));
 
-            showSuccess(`Added "${item.name}" to favorites.`);
+            showSuccess(t('Added "{name}" to favorites.', { name: item.name }));
         } catch (error) {
             console.error('Failed to add to favorites:', error);
-            showError('Failed to add to favorites.');
+            showError(t('Failed to add to favorites.'));
         }
     }, []);
 
@@ -123,17 +124,17 @@ export default function ContextMenuProvider({ children }) {
             }
             
             await navigator.clipboard.writeText(pathToCopy);
-            showSuccess(`Path copied to clipboard: ${pathToCopy}`);
+            showSuccess(t('Path copied to clipboard: {path}', { path: pathToCopy }));
         } catch (error) {
             console.error('Failed to copy path:', error);
-            showError('Failed to copy path to clipboard.');
+            showError(t('Failed to copy path to clipboard.'));
         }
     }, [isSftpPath, parseSftpPath]);
 
     // Add as template
     const addAsTemplate = useCallback(async (item) => {
         if (!item || item.isDirectory || 'sub_file_count' in item) {
-            showError('Only files can be added as templates.');
+            showError(t('Only files can be added as templates.'));
             return;
         }
 
@@ -148,13 +149,13 @@ export default function ContextMenuProvider({ children }) {
                     const tempPath = await downloadAndOpenSftpFile(item.path, false);
                     
                     if (!tempPath) {
-                        throw new Error('Failed to download SFTP file');
+                        throw new Error(t('Failed to download SFTP file'));
                     }
                     
                     templatePath = tempPath;
                 } catch (downloadError) {
                     console.error('Failed to download SFTP file for template:', downloadError);
-                    showError(`Failed to download SFTP file: ${downloadError.message || downloadError}`);
+                    showError(t('Failed to download SFTP file: {error}', { error: downloadError.message || downloadError }));
                     return;
                 }
             }
@@ -162,12 +163,12 @@ export default function ContextMenuProvider({ children }) {
             const result = await invoke('add_template', {
                 templatePath: templatePath
             });
-            showSuccess(`Template added successfully: ${result}`);
+            showSuccess(t('Template added successfully: {name}', { name: result }));
 
             window.dispatchEvent(new CustomEvent('templates-updated'));
         } catch (error) {
             console.error('Failed to add template:', error);
-            showError(`Failed to add template: ${error.message || error}`);
+            showError(t('Failed to add template: {error}', { error: error.message || error }));
         } finally {
             setIsProcessing(false);
         }
@@ -270,7 +271,7 @@ export default function ContextMenuProvider({ children }) {
                             // SFTP to SFTP move
                             await moveSftpItem(sourcePath, destPath);
                         } else {
-                            showError('Moving between SFTP and local file systems is not yet supported');
+                            showError(t('Moving between SFTP and local file systems is not yet supported'));
                             continue;
                         }
                     } else {
@@ -289,7 +290,7 @@ export default function ContextMenuProvider({ children }) {
                             // SFTP to SFTP copy
                             await copySftpItem(sourcePath, destPath);
                         } else {
-                            showError('Copying between SFTP and local file systems is not yet supported');
+                            showError(t('Copying between SFTP and local file systems is not yet supported'));
                             continue;
                         }
                     } else {
@@ -315,7 +316,7 @@ export default function ContextMenuProvider({ children }) {
             await loadDirectory(currentPath);
         } catch (error) {
             console.error('Paste operation failed:', error);
-            showError(`Failed to paste: ${error.message || error}`);
+            showError(t('Failed to paste: {error}', { error: error.message || error }));
         } finally {
             setIsProcessing(false);
         }
@@ -326,10 +327,10 @@ export default function ContextMenuProvider({ children }) {
         if (!items.length) return;
 
         const itemNames = items.map(item => item.name).join(', ');
-        const confirmMessage = `Are you sure you want to move ${items.length === 1 ? itemNames : `${items.length} items`} to trash?`;
+        const confirmMessage = t('Are you sure you want to move {items} to the Trash?', { items: items.length === 1 ? itemNames : plural(items.length, PLURALS.items) });
 
         // Use custom confirm dialog
-        const shouldDelete = await showConfirm(confirmMessage, 'Move to Trash');
+        const shouldDelete = await showConfirm(confirmMessage, t('Move to Trash'));
         if (!shouldDelete) return;
 
         setIsProcessing(true);
@@ -340,7 +341,7 @@ export default function ContextMenuProvider({ children }) {
             }
         } catch (error) {
             console.error('Delete operation failed:', error);
-            showError(`Failed to delete: ${error.message || error}`);
+            showError(t('Failed to delete: {error}', { error: error.message || error }));
         } finally {
             setIsProcessing(false);
         }
@@ -362,7 +363,7 @@ export default function ContextMenuProvider({ children }) {
         const isAllSftp = items.every(item => isSftpPath(item.path));
         
         if (isSftpItems && !isAllSftp) {
-            showError('Cannot mix SFTP and local files in the same archive');
+            showError(t('Cannot mix SFTP and local files in the same archive'));
             return;
         }
 
@@ -376,7 +377,7 @@ export default function ContextMenuProvider({ children }) {
             zipName = `${baseName}.zip`;
         } else {
             // For multiple items, ask user for zip name
-            zipName = window.prompt('Enter name for the zip file:', 'archive.zip');
+            zipName = window.prompt(t('Enter name for the zip file:'), 'archive.zip');
             if (!zipName) return;
             if (!zipName.endsWith('.zip')) {
                 zipName += '.zip';
@@ -396,7 +397,7 @@ export default function ContextMenuProvider({ children }) {
                 for (const item of items) {
                     const tempPath = await downloadAndOpenSftpFile(item.path, false);
                     if (!tempPath) {
-                        throw new Error(`Failed to download ${item.name} for zipping`);
+                        throw new Error(t('Failed to download {name} for zipping', { name: item.name }));
                     }
                     tempPaths.push(tempPath);
                 }
@@ -419,7 +420,7 @@ export default function ContextMenuProvider({ children }) {
                         
                         // Upload the zip file (we'd need an upload function in SFTP provider)
                         // For now, we'll copy it to local temp and let user know
-                        showSuccess(`ZIP created locally at: ${tempZipPath}. SFTP upload not yet implemented.`);
+                        showSuccess(t('ZIP created locally at: {path}. SFTP upload not yet implemented.', { path: tempZipPath }));
                     }
                 } else {
                     // Copy zip to current local directory
@@ -427,13 +428,13 @@ export default function ContextMenuProvider({ children }) {
                         sourcePath: tempZipPath,
                         destinationPath: destinationPath
                     });
-                    showSuccess(`Successfully created ${zipName}`);
+                    showSuccess(t('Successfully created {name}', { name: zipName }));
                 }
                 
                 await loadDirectory(currentPath);
             } catch (error) {
                 console.error('SFTP zip operation failed:', error);
-                showError(`Failed to create zip: ${error.message || error}`);
+                showError(t('Failed to create zip: {error}', { error: error.message || error }));
             } finally {
                 setIsProcessing(false);
             }
@@ -450,10 +451,10 @@ export default function ContextMenuProvider({ children }) {
                 });
 
                 await loadDirectory(currentPath);
-                showSuccess(`Successfully created ${destinationPath.split('/').pop()}`);
+                showSuccess(t('Successfully created {name}', { name: destinationPath.split('/').pop() }));
             } catch (error) {
                 console.error('Zip operation failed:', error);
-                showError(`Failed to create zip: ${error.message || error}`);
+                showError(t('Failed to create zip: {error}', { error: error.message || error }));
             } finally {
                 setIsProcessing(false);
             }
@@ -471,7 +472,7 @@ export default function ContextMenuProvider({ children }) {
                 console.log('📡 SFTP zip file detected, downloading for extraction...');
                 const tempZipPath = await downloadAndOpenSftpFile(item.path, false);
                 if (!tempZipPath) {
-                    throw new Error('Failed to download SFTP zip file for extraction');
+                    throw new Error(t('Failed to download SFTP zip file for extraction'));
                 }
                 
                 // Extract to temp directory first
@@ -484,20 +485,20 @@ export default function ContextMenuProvider({ children }) {
                 
                 // For now, we'll extract locally and notify user
                 // TODO: Implement upload of extracted files back to SFTP
-                showSuccess(`ZIP extracted locally to: ${tempExtractPath}. SFTP upload of extracted files not yet implemented.`);
+                showSuccess(t('ZIP extracted locally to: {path}. SFTP upload of extracted files not yet implemented.', { path: tempExtractPath }));
             } else {
                 // Handle local zip files (original logic)
                 await invoke('unzip', {
                     zipPaths: [item.path],
                     destinationPath: currentPath
                 });
-                showSuccess(`Successfully extracted ${item.name}`);
+                showSuccess(t('Successfully extracted {name}', { name: item.name }));
             }
 
             await loadDirectory(currentPath);
         } catch (error) {
             console.error('Unzip operation failed:', error);
-            showError(`Failed to extract: ${error.message || error}`);
+            showError(t('Failed to extract: {error}', { error: error.message || error }));
         } finally {
             setIsProcessing(false);
         }
@@ -509,7 +510,7 @@ export default function ContextMenuProvider({ children }) {
 
         if (!item || item.isDirectory || 'sub_file_count' in item) {
             console.log('❌ Item invalid for hash generation');
-            showError('Hash generation is only available for files.');
+            showError(t('Hash generation is only available for files.'));
             return;
         }
 
@@ -524,7 +525,7 @@ export default function ContextMenuProvider({ children }) {
                 console.log('📡 SFTP file detected, downloading for hash generation...');
                 const tempPath = await downloadAndOpenSftpFile(item.path, false);
                 if (!tempPath) {
-                    throw new Error('Failed to download SFTP file for hash generation');
+                    throw new Error(t('Failed to download SFTP file for hash generation'));
                 }
                 hashPath = tempPath;
                 console.log('✅ SFTP file downloaded to:', hashPath);
@@ -538,7 +539,7 @@ export default function ContextMenuProvider({ children }) {
             // Try to copy hash to clipboard, with fallback if it fails
             try {
                 await navigator.clipboard.writeText(hash);
-                showSuccess(`Hash generated and copied to clipboard: ${hash.substring(0, 16)}...`);
+                showSuccess(t('Hash generated and copied to clipboard: {hash}...', { hash: hash.substring(0, 16) }));
             } catch (clipboardError) {
                 console.warn('📋 Clipboard access failed, showing hash display modal instead:', clipboardError);
                 
@@ -550,7 +551,7 @@ export default function ContextMenuProvider({ children }) {
             }
         } catch (error) {
             console.error('💥 Hash generation failed:', error);
-            showError(`Failed to generate hash: ${error.message || error}`);
+            showError(t('Failed to generate hash: {error}', { error: error.message || error }));
         } finally {
             setIsProcessing(false);
         }
@@ -562,7 +563,7 @@ export default function ContextMenuProvider({ children }) {
 
         if (!item || item.isDirectory || 'sub_file_count' in item) {
             console.log('❌ Item invalid for hash file generation');
-            showError('Hash generation is only available for files.');
+            showError(t('Hash generation is only available for files.'));
             return;
         }
 
@@ -575,7 +576,7 @@ export default function ContextMenuProvider({ children }) {
             try {
                 const tempPath = await downloadAndOpenSftpFile(item.path, false);
                 if (!tempPath) {
-                    throw new Error('Failed to download SFTP file for hash generation');
+                    throw new Error(t('Failed to download SFTP file for hash generation'));
                 }
                 // Create a modified item with the temp path for hash generation
                 processedItem = {
@@ -586,7 +587,7 @@ export default function ContextMenuProvider({ children }) {
                 console.log('✅ SFTP file downloaded for hash generation:', tempPath);
             } catch (error) {
                 console.error('Failed to download SFTP file for hash generation:', error);
-                showError(`Failed to download SFTP file: ${error.message || error}`);
+                showError(t('Failed to download SFTP file: {error}', { error: error.message || error }));
                 setIsProcessing(false);
                 return;
             } finally {
@@ -612,7 +613,7 @@ export default function ContextMenuProvider({ children }) {
 
         if (!item || item.isDirectory || 'sub_file_count' in item) {
             console.log('❌ Item invalid for hash comparison');
-            showError('Hash comparison is only available for files.');
+            showError(t('Hash comparison is only available for files.'));
             return;
         }
 
@@ -625,7 +626,7 @@ export default function ContextMenuProvider({ children }) {
             try {
                 const tempPath = await downloadAndOpenSftpFile(item.path, false);
                 if (!tempPath) {
-                    throw new Error('Failed to download SFTP file for hash comparison');
+                    throw new Error(t('Failed to download SFTP file for hash comparison'));
                 }
                 // Create a modified item with the temp path for hash comparison
                 processedItem = {
@@ -636,7 +637,7 @@ export default function ContextMenuProvider({ children }) {
                 console.log('✅ SFTP file downloaded for hash comparison:', tempPath);
             } catch (error) {
                 console.error('Failed to download SFTP file for hash comparison:', error);
-                showError(`Failed to download SFTP file: ${error.message || error}`);
+                showError(t('Failed to download SFTP file: {error}', { error: error.message || error }));
                 setIsProcessing(false);
                 return;
             } finally {
@@ -825,7 +826,7 @@ export default function ContextMenuProvider({ children }) {
                             }
                         } catch (error) {
                             console.error('Failed to open file:', error);
-                            showError(`Failed to open file: ${error.message || error}`);
+                            showError(t('Failed to open file: {error}', { error: error.message || error }));
                         }
                     }
                 }
@@ -870,7 +871,7 @@ export default function ContextMenuProvider({ children }) {
             },
             {
                 id: 'delete',
-                label: 'Delete',
+                label: 'Move to Trash',
                 icon: 'delete',
                 disabled: isProcessing,
                 action: () => deleteItems(targetItems)

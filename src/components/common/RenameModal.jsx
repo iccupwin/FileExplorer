@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
+import { useI18n } from '../../i18n';
 
 /**
  * Modal component for renaming files and folders
@@ -15,6 +16,7 @@ import Button from '../common/Button';
  */
 const RenameModal = ({ isOpen, onClose, item, onRename }) => {
     const [newName, setNewName] = useState('');
+    const { t } = useI18n();
     const inputRef = useRef(null);
 
     /**
@@ -85,7 +87,7 @@ const RenameModal = ({ isOpen, onClose, item, onRename }) => {
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={`Rename ${isDirectory ? 'Folder' : 'File'}`}
+            title={isDirectory ? t('Rename Folder') : t('Rename File')}
             size="sm"
             footer={
                 <>
@@ -93,7 +95,7 @@ const RenameModal = ({ isOpen, onClose, item, onRename }) => {
                         variant="ghost"
                         onClick={onClose}
                     >
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                     <Button
                         type="submit"
@@ -101,7 +103,7 @@ const RenameModal = ({ isOpen, onClose, item, onRename }) => {
                         disabled={!newName || !newName.trim() || newName.trim() === item.name}
                         onClick={handleSubmit}
                     >
-                        Rename
+                        {t('Rename')}
                     </Button>
                 </>
             }
@@ -109,7 +111,7 @@ const RenameModal = ({ isOpen, onClose, item, onRename }) => {
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
                     <label htmlFor="new-name">
-                        {isDirectory ? 'Folder name:' : 'File name:'}
+                        {isDirectory ? t('Folder name:') : t('File name:')}
                     </label>
                     <input
                         ref={inputRef}
@@ -119,12 +121,12 @@ const RenameModal = ({ isOpen, onClose, item, onRename }) => {
                         onChange={handleChange}
                         onKeyDown={handleKeyDown}
                         className="input"
-                        placeholder={`Enter new ${isDirectory ? 'folder' : 'file'} name`}
+                        placeholder={isDirectory ? t('Enter new folder name') : t('Enter new file name')}
                     />
                     <div className="input-hint">
                         {isDirectory
-                            ? 'Choose a descriptive name for your folder'
-                            : 'Include the file extension (e.g., .txt, .jpg, .pdf)'
+                            ? t('Choose a descriptive name for your folder')
+                            : t('Include the file extension (e.g., .txt, .jpg, .pdf)')
                         }
                     </div>
                 </div>

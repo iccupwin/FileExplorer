@@ -1,6 +1,7 @@
 /**
  * Simple notification system to replace browser alerts
  */
+import { t } from '../i18n';
 
 let notificationContainer = null;
 
@@ -25,7 +26,7 @@ export const showNotification = (message, type = 'info', duration = 3000) => {
     initNotificationContainer();
 
     const notification = document.createElement('div');
-    notification.textContent = message;
+    notification.textContent = t(message);
 
     const colors = {
         info: { bg: '#0891b2', text: 'white' },
@@ -143,7 +144,7 @@ export const showConfirm = (message, title = 'Confirm') => {
         `;
 
         const titleEl = document.createElement('h3');
-        titleEl.textContent = title;
+        titleEl.textContent = t(title);
         titleEl.style.cssText = `
             margin: 0 0 16px 0;
             color: #1a1c1e;
@@ -151,7 +152,7 @@ export const showConfirm = (message, title = 'Confirm') => {
         `;
 
         const messageEl = document.createElement('p');
-        messageEl.textContent = message;
+        messageEl.textContent = t(message);
         messageEl.style.cssText = `
             margin: 0 0 24px 0;
             color: #4b5563;
@@ -166,7 +167,7 @@ export const showConfirm = (message, title = 'Confirm') => {
         `;
 
         const cancelBtn = document.createElement('button');
-        cancelBtn.textContent = 'Cancel';
+        cancelBtn.textContent = t('Cancel');
         cancelBtn.style.cssText = `
             padding: 8px 16px;
             border: 1px solid #e0e4e8;
@@ -177,7 +178,7 @@ export const showConfirm = (message, title = 'Confirm') => {
         `;
 
         const confirmBtn = document.createElement('button');
-        confirmBtn.textContent = 'Confirm';
+        confirmBtn.textContent = t('Confirm');
         confirmBtn.style.cssText = `
             padding: 8px 16px;
             border: none;

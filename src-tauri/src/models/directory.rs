@@ -13,4 +13,7 @@ pub struct Directory {
     pub created: String,
     pub last_modified: String,
     pub accessed: String,
+    /// When the item was added to its folder (macOS "Date Added"); falls back to `created`
+    #[serde(default)]
+    pub date_added: String,
 }

@@ -5,6 +5,7 @@ import { useHistory } from '../../providers/HistoryProvider';
 import { formatFileSize } from '../../utils/formatters';
 import './thisPc.css';
 import {showConfirm, showError, showSuccess} from "../../utils/NotificationSystem.js";
+import { useI18n } from '../../i18n';
 
 /**
  * ThisPCView component - Displays system information, user folders, and storage drives
@@ -13,6 +14,7 @@ import {showConfirm, showError, showSuccess} from "../../utils/NotificationSyste
  * @returns {React.ReactElement} ThisPCView component
  */
 const ThisPCView = () => {
+    const { t } = useI18n();
     const [systemInfo, setSystemInfo] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const { volumes, loadDirectory, loadVolumes } = useFileSystem();
@@ -110,6 +112,14 @@ const ThisPCView = () => {
                 let foundPath = null;
 
                 console.log(`Checking ${config.name} with paths:`, config.paths);
+
+                // On macOS the standard user folders always exist. Reading their contents just
+                // to check them would trigger a privacy prompt for every folder at once, so
+                // only read a folder when the user actually opens it.
+                if (systemInfo.current_running_os?.toLowerCase() === 'macos' && config.paths.length > 0) {
+                    folders.push({ name: config.name, path: config.paths[0], icon: config.icon });
+                    continue;
+                }
 
                 // Try each possible path for this folder type
                 for (const path of config.paths) {
@@ -243,7 +253,7 @@ const ThisPCView = () => {
             navigateTo(path);
         } catch (error) {
             console.error('Failed to navigate to folder:', error);
-            showError(`Cannot access ${path}. The folder may not exist or is inaccessible.`);
+            showError(t('Cannot access {path}. The folder may not exist or is inaccessible.', { path }));
         }
     };
 
@@ -263,7 +273,7 @@ const ThisPCView = () => {
     const ejectVolume = async (volume) => {
         if (!volume.is_removable) return;
 
-        const confirmEject = await showConfirm(`Are you sure you want to safely eject ${volume.volume_name}?`);
+        const confirmEject = await showConfirm(t('Are you sure you want to safely eject {name}?', { name: volume.volume_name }));
         if (!confirmEject) return;
 
         try {
@@ -286,13 +296,13 @@ const ThisPCView = () => {
             const commandResponse = JSON.parse(result);
             
             if (commandResponse.status === 0) {
-                showSuccess(`${volume.volume_name} has been safely ejected.`);
+                showSuccess(t('{name} has been safely ejected.', { name: volume.volume_name }));
                 // Reload volumes to update the UI after ejection
                 setTimeout(() => {
                     loadVolumes();
                 }, 1000);
             } else {
-                throw new Error(commandResponse.stderr || commandResponse.stdout || 'Ejection failed');
+                throw new Error(commandResponse.stderr || commandResponse.stdout || t('Ejection failed'));
             }
         } catch (error) {
             console.error('Failed to eject volume:', error);
@@ -306,7 +316,7 @@ const ThisPCView = () => {
                 // If not JSON, use as-is
             }
             
-            showError(`Failed to eject ${volume.volume_name}: ${errorMessage}`);
+            showError(t('Failed to eject {name}: {error}', { name: volume.volume_name, error: errorMessage }));
         }
     };
 
@@ -314,7 +324,7 @@ const ThisPCView = () => {
         return (
             <div className="this-pc-loading">
                 <div className="spinner"></div>
-                <p>Loading system information...</p>
+                <p>{t('Loading system information...')}</p>
             </div>
         );
     }
@@ -322,10 +332,10 @@ const ThisPCView = () => {
     return (
         <div className="this-pc-view">
             <div className="this-pc-header">
-                <h2>This PC</h2>
+                <h2>{t('This PC')}</h2>
                 {systemInfo && (
                     <div className="system-info">
-                        <span>Running {systemInfo.current_running_os}</span>
+                        <span>{t('Running {os}', { os: systemInfo.current_running_os })}</span>
                         {systemInfo.current_cpu_architecture && (
                             <span> • {systemInfo.current_cpu_architecture}</span>
                         )}
@@ -336,7 +346,7 @@ const ThisPCView = () => {
             {/* User Folders Section */}
             {userFolders.length > 0 && (
                 <div className="pc-section">
-                    <h3>Folders</h3>
+                    <h3>{t('Folders')}</h3>
                     <div className="folders-grid">
                         {userFolders.map((folder) => (
                             <div
@@ -348,7 +358,7 @@ const ThisPCView = () => {
                                     <span className={`icon icon-${folder.icon}`}></span>
                                 </div>
                                 <div className="folder-details">
-                                    <div className="folder-name">{folder.name}</div>
+                                    <div className="folder-name">{t(folder.name)}</div>
                                     <div className="folder-path">{folder.path}</div>
                                 </div>
                             </div>
@@ -359,7 +369,7 @@ const ThisPCView = () => {
 
             {/* Drives Section */}
             <div className="pc-section">
-                <h3>Drives</h3>
+                <h3>{t('Drives')}</h3>
                 <div className="drives-grid">
                     {volumes.map((volume) => {
                         const usedSpace = volume.size - volume.available_space;
@@ -385,7 +395,7 @@ const ThisPCView = () => {
 
                                     <div className="drive-storage">
                                         <div className="storage-info">
-                                            <span>{formatFileSize(volume.available_space)} free of {formatFileSize(volume.size)}</span>
+                                            <span>{t('{free} free of {total}', { free: formatFileSize(volume.available_space), total: formatFileSize(volume.size) })}</span>
                                         </div>
                                         <div className="storage-bar">
                                             <div
@@ -404,7 +414,7 @@ const ThisPCView = () => {
                                                 e.stopPropagation();
                                                 ejectVolume(volume);
                                             }}
-                                            title="Safely eject"
+                                            title={t('Safely eject')}
                                         >
                                             <span className="icon icon-eject"></span>
                                         </button>
@@ -419,27 +429,27 @@ const ThisPCView = () => {
             {/* System Information */}
             {systemInfo && (
                 <div className="pc-section">
-                    <h3>System Information</h3>
+                    <h3>{t('System Information')}</h3>
                     <div className="system-details">
                         <div className="detail-row">
-                            <span className="detail-label">Operating System:</span>
+                            <span className="detail-label">{t('Operating System:')}</span>
                             <span className="detail-value">{systemInfo.current_running_os}</span>
                         </div>
                         {systemInfo.current_cpu_architecture && (
                             <div className="detail-row">
-                                <span className="detail-label">Architecture:</span>
+                                <span className="detail-label">{t('Architecture:')}</span>
                                 <span className="detail-value">{systemInfo.current_cpu_architecture}</span>
                             </div>
                         )}
                         {systemInfo.user_home_dir && (
                             <div className="detail-row">
-                                <span className="detail-label">User Directory:</span>
+                                <span className="detail-label">{t('User Directory:')}</span>
                                 <span className="detail-value">{systemInfo.user_home_dir}</span>
                             </div>
                         )}
                         {systemInfo.version && (
                             <div className="detail-row">
-                                <span className="detail-label">Version:</span>
+                                <span className="detail-label">{t('Version:')}</span>
                                 <span className="detail-value">{systemInfo.version}</span>
                             </div>
                         )}

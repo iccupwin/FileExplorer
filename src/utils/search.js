@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { t } from '../i18n';
 
 /**
  * Search options for configuring search behavior.
@@ -44,7 +45,7 @@ export const searchFiles = async (query, options = DEFAULT_SEARCH_OPTIONS) => {
         return mockSearchResults(query, options);
     } catch (error) {
         console.error('Search error:', error);
-        throw new Error(`Search failed: ${error.message}`);
+        throw new Error(t('Search failed: {error}', { error: error.message }));
     }
 };
 

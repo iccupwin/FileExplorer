@@ -1,5 +1,6 @@
 import React from 'react';
 import { getFileIconType } from '../../utils/icons';
+import useSystemIcon from '../../hooks/useSystemIcon';
 
 /**
  * Component that displays an appropriate icon for a file or directory
@@ -7,9 +8,12 @@ import { getFileIconType } from '../../utils/icons';
  * @param {string} props.filename - Name of the file or directory
  * @param {boolean} props.isDirectory - Whether the item is a directory
  * @param {string} [props.size='medium'] - Size of the icon: 'small', 'medium', or 'large'
+ * @param {string} [props.path] - Absolute path; on macOS the real Finder icon is shown
+ * @param {number} [props.iconSize=128] - Pixel size of the system icon to request
  * @returns {React.ReactElement} File icon component
  */
-const FileIcon = ({ filename, isDirectory, size = 'medium' }) => {
+const FileIcon = ({ filename, isDirectory, size = 'medium', path, iconSize = 128 }) => {
+    const systemIcon = useSystemIcon(path, isDirectory, iconSize);
     // Determine the appropriate icon
     const iconType = isDirectory ? 'folder' : getFileIconType(filename);
 
@@ -31,6 +35,14 @@ const FileIcon = ({ filename, isDirectory, size = 'medium' }) => {
     };
 
     const extension = getFileExtension(filename);
+
+    if (systemIcon) {
+        return (
+            <div className={`file-icon file-icon-system ${sizeClasses[size] || ''}`}>
+                <img src={systemIcon} alt="" draggable={false} />
+            </div>
+        );
+    }
 
     // Return the appropriate icon SVG based on type
     return (

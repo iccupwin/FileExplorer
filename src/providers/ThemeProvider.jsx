@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { t } from '../i18n';
 
 // Create context
 const ThemeContext = createContext({
@@ -189,7 +190,7 @@ export default function ThemeProvider({ children }) {
                     color: '#6b7280',
                     fontSize: '14px'
                 }}>
-                    Loading theme...
+                    {t('Loading theme...')}
                 </div>
                 <style jsx global>{`
                     @keyframes spin {

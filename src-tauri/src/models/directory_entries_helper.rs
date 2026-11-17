@@ -202,6 +202,78 @@ pub fn format_system_time(system_time: SystemTime) -> String {
     datetime.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
+/// Reads the macOS "Date Added" attribute (ATTR_CMN_ADDEDTIME) of `path`.
+#[cfg(target_os = "macos")]
+fn read_date_added(path: &std::path::Path) -> Option<SystemTime> {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+    use std::time::{Duration, UNIX_EPOCH};
+
+    #[repr(C)]
+    struct AttrList {
+        bitmapcount: u16,
+        reserved: u16,
+        commonattr: u32,
+        volattr: u32,
+        dirattr: u32,
+        fileattr: u32,
+        forkattr: u32,
+    }
+
+    #[repr(C, packed(4))]
+    struct AddedTimeBuf {
+        length: u32,
+        added: libc::timespec,
+    }
+
+    const ATTR_BIT_MAP_COUNT: u16 = 5;
+    const ATTR_CMN_ADDEDTIME: u32 = 0x1000_0000;
+    const FSOPT_NOFOLLOW: u32 = 0x0000_0001;
+
+    let c_path = CString::new(path.as_os_str().as_bytes()).ok()?;
+    let mut attrs = AttrList {
+        bitmapcount: ATTR_BIT_MAP_COUNT,
+        reserved: 0,
+        commonattr: ATTR_CMN_ADDEDTIME,
+        volattr: 0,
+        dirattr: 0,
+        fileattr: 0,
+        forkattr: 0,
+    };
+    let mut buf: AddedTimeBuf = unsafe { std::mem::zeroed() };
+
+    let rc = unsafe {
+        libc::getattrlist(
+            c_path.as_ptr(),
+            &mut attrs as *mut AttrList as *mut libc::c_void,
+            &mut buf as *mut AddedTimeBuf as *mut libc::c_void,
+            std::mem::size_of::<AddedTimeBuf>(),
+            FSOPT_NOFOLLOW,
+        )
+    };
+    let length = buf.length as usize;
+    if rc != 0 || length < std::mem::size_of::<AddedTimeBuf>() {
+        return None; // attribute not available (e.g. some volumes)
+    }
+    let added = buf.added;
+    if added.tv_sec <= 0 {
+        return None;
+    }
+    Some(UNIX_EPOCH + Duration::new(added.tv_sec as u64, added.tv_nsec.max(0) as u32))
+}
+
+/// "Date Added" of `path` formatted like the other timestamps.
+/// Falls back to the creation time when the attribute is not available.
+pub fn date_added_string(path: &std::path::Path, metadata: &std::fs::Metadata) -> String {
+    #[cfg(target_os = "macos")]
+    if let Some(time) = read_date_added(path) {
+        return format_system_time(time);
+    }
+    metadata
+        .created()
+        .map_or("1970-01-01 00:00:00".to_string(), format_system_time)
+}
+
 /// This function calculates the size of a directory in bytes.
 /// It uses the WalkDir crate to recursively walk through the directory and sum up the sizes of all files.
 ///
@@ -342,4 +414,23 @@ pub fn count_subdirectories(path: &str) -> usize {
     }
 
     dir_count
+}
+
+#[cfg(test)]
+mod date_added_tests {
+    use super::*;
+
+    #[test]
+    fn date_added_is_set_for_new_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("added.txt");
+        std::fs::write(&path, b"x").unwrap();
+        let metadata = std::fs::metadata(&path).unwrap();
+        let added = date_added_string(&path, &metadata);
+        assert_eq!(added.len(), "2026-01-01 00:00:00".len());
+        assert!(!added.starts_with("1970"), "unexpected date: {added}");
+        // Freshly created file: added time equals creation time (same second)
+        let created = format_system_time(metadata.created().unwrap());
+        assert_eq!(added[..16], created[..16]);
+    }
 }

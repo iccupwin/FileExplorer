@@ -1,6 +1,7 @@
 import React from 'react';
 import { useHistory } from '../../providers/HistoryProvider';
 import { useFileSystem } from '../../providers/FileSystemProvider';
+import { useI18n } from '../../i18n';
 import './navigationButtons.css';
 
 /**
@@ -10,6 +11,7 @@ import './navigationButtons.css';
 const NavigationButtons = () => {
     const { canGoBack, canGoForward, goBack, goForward, currentPath } = useHistory();
     const { loadDirectory, loadVolumes } = useFileSystem();
+    const { t } = useI18n();
 
     /**
      * Handles directory refresh action
@@ -26,7 +28,7 @@ const NavigationButtons = () => {
 
                 // Optionally show a brief success indicator
                 const notification = document.createElement('div');
-                notification.textContent = 'Directory and disks refreshed';
+                notification.textContent = t('Directory and disks refreshed');
                 notification.style.cssText = `
                     position: fixed;
                     top: 20px;
@@ -48,7 +50,7 @@ const NavigationButtons = () => {
 
                 // Show error notification
                 const notification = document.createElement('div');
-                notification.textContent = 'Failed to refresh directory or disks';
+                notification.textContent = t('Failed to refresh directory or disks');
                 notification.style.cssText = `
                     position: fixed;
                     top: 20px;
@@ -75,7 +77,7 @@ const NavigationButtons = () => {
 
                 // Optionally show a brief success indicator
                 const notification = document.createElement('div');
-                notification.textContent = 'Volumes refreshed';
+                notification.textContent = t('Volumes refreshed');
                 notification.style.cssText = `
                     position: fixed;
                     top: 20px;
@@ -97,7 +99,7 @@ const NavigationButtons = () => {
 
                 // Show error notification
                 const notification = document.createElement('div');
-                notification.textContent = 'Failed to refresh volumes';
+                notification.textContent = t('Failed to refresh volumes');
                 notification.style.cssText = `
                     position: fixed;
                     top: 20px;
@@ -124,8 +126,8 @@ const NavigationButtons = () => {
                 className="nav-button"
                 onClick={goBack}
                 disabled={!canGoBack}
-                aria-label="Go back"
-                title="Go back"
+                aria-label={t('Go back')}
+                title={t('Go back')}
             >
                 <span className="icon icon-arrow-left"></span>
             </button>
@@ -134,8 +136,8 @@ const NavigationButtons = () => {
                 className="nav-button"
                 onClick={goForward}
                 disabled={!canGoForward}
-                aria-label="Go forward"
-                title="Go forward"
+                aria-label={t('Go forward')}
+                title={t('Go forward')}
             >
                 <span className="icon icon-arrow-right"></span>
             </button>
@@ -143,8 +145,8 @@ const NavigationButtons = () => {
             <button
                 className="nav-button"
                 onClick={handleRefresh}
-                aria-label="Refresh"
-                title="Refresh current directory"
+                aria-label={t('Refresh')}
+                title={t('Refresh current directory')}
             >
                 <span className="icon icon-refresh"></span>
             </button>

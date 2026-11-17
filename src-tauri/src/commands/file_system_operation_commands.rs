@@ -1,6 +1,6 @@
 use crate::error_handling::{Error, ErrorCode};
 use crate::models::{
-    count_subdirectories, count_subfiles, format_system_time, get_access_permission_number,
+    date_added_string, format_system_time, get_access_permission_number,
     get_access_permission_string, Entries,
 };
 use crate::{log_error, models};
@@ -184,8 +184,10 @@ pub async fn open_directory(path: String) -> Result<String, String> {
                 access_rights_as_string: get_access_permission_string(metadata.permissions(), true),
                 access_rights_as_number: get_access_permission_number(metadata.permissions(), true),
                 size_in_bytes: 0,
-                sub_file_count: path_of_entry.to_str().map(count_subfiles).unwrap_or(0),
-                sub_dir_count: path_of_entry.to_str().map(count_subdirectories).unwrap_or(0),
+                // Not counted here: reading every subfolder made listings slow and
+                // triggered macOS privacy prompts. See `count_directory_entries`.
+                sub_file_count: 0,
+                sub_dir_count: 0,
                 created: metadata
                     .created()
                     .map_or("1970-01-01 00:00:00".to_string(), |time| {
@@ -201,6 +203,7 @@ pub async fn open_directory(path: String) -> Result<String, String> {
                     .map_or("1970-01-01 00:00:00".to_string(), |time| {
                         format_system_time(time)
                     }),
+                date_added: date_added_string(&path_of_entry, &metadata),
             });
         } else if file_type.is_file() {
             files.push(models::File {
@@ -231,6 +234,7 @@ pub async fn open_directory(path: String) -> Result<String, String> {
                     .map_or("1970-01-01 00:00:00".to_string(), |time| {
                         format_system_time(time)
                     }),
+                date_added: date_added_string(&path_of_entry, &metadata),
             });
         }
     }
@@ -2288,4 +2292,13 @@ mod tests_file_system_operation_commands {
             "Error message does not match expected value"
         );
     }
+}
+
+/// Counts the files and folders directly inside `path` (used on demand by the
+/// details panel instead of during every directory listing).
+#[tauri::command]
+pub async fn count_directory_entries(path: String) -> Result<(usize, usize), String> {
+    tokio::task::spawn_blocking(move || crate::models::count_subfiles_and_subdirectories(&path))
+        .await
+        .map_err(|e| e.to_string())
 }

@@ -3,10 +3,12 @@ import { useTheme } from '../providers/ThemeProvider';
 import { useFileSystem } from '../providers/FileSystemProvider';
 import { useContextMenu } from '../providers/ContextMenuProvider';
 import { useHistory } from '../providers/HistoryProvider';
+import { getDirectoryPath } from '../utils/pathUtils';
 import { useSettings } from '../providers/SettingsProvider';
 import { useSftp } from '../providers/SftpProvider';
 import { invoke } from '@tauri-apps/api/core';
 import { showError, showConfirm, showSuccess } from '../utils/NotificationSystem';
+import { useI18n } from '../i18n';
 
 // Core Components
 import Sidebar from '../components/sidebar/Sidebar';
@@ -42,6 +44,9 @@ import { usePreview } from '../hooks/usePreview';
 
 import '../styles/layouts/mainLayout.css';
 import {replaceFileName} from "../utils/pathUtils.js";
+import SortFilterMenu from '../components/explorer/SortFilterMenu';
+import ColumnView from '../components/explorer/ColumnView';
+import useFileDragDrop from '../hooks/useFileDragDrop';
 
 /**
  * MainLayout component that serves as the primary layout structure for the application.
@@ -50,8 +55,9 @@ import {replaceFileName} from "../utils/pathUtils.js";
  * @returns {JSX.Element} The MainLayout component
  */
 const MainLayout = () => {
+    const { t } = useI18n();
     const { theme, toggleTheme } = useTheme();
-    const { isLoading, currentDirData, selectedItems, loadDirectory, volumes, focusedItem, setFocusedItem, renameItem: fsRenameItem } = useFileSystem();
+    const { isLoading, currentDirData, selectedItems, loadDirectory, volumes, focusedItem, setFocusedItem, renameItem: fsRenameItem, refreshDirectory, moveToTrash, openFile } = useFileSystem();
     const { isSftpPath, parseSftpPath, createSftpUrl } = useSftp();
     const { 
         isOpen: isContextMenuOpen, 
@@ -66,7 +72,14 @@ const MainLayout = () => {
         renameItem,
         showProperties
     } = useContextMenu();
-    const { currentPath, navigateTo } = useHistory();
+    const { currentPath, navigateTo, goBack, goForward } = useHistory();
+
+    // Drop files onto folders, the sidebar or the open folder (from Finder or Explr)
+    useFileDragDrop({
+        currentPath,
+        onTransferred: () => refreshDirectory?.(),
+        onError: (message) => showError(message),
+    });
     const { settings, updateSetting } = useSettings();
 
     // UI State - Initialize from settings
@@ -289,7 +302,7 @@ const MainLayout = () => {
                         });
                         
                         console.log('MainLayout: Auto-indexing initiated:', result);
-                        showSuccess('Background indexing started for your home directory');
+                        showSuccess(t('Background indexing started for your home directory'));
                     } else {
                         console.log('MainLayout: Search engine already has indexed files, skipping auto-indexing');
                     }
@@ -300,8 +313,11 @@ const MainLayout = () => {
             }
         };
 
-        // Only run once when volumes are first loaded
-        if (volumes.length > 0) {
+        // Only run once when volumes are first loaded.
+        // On macOS global search uses Spotlight, so the full home-folder crawl
+        // (which ran on every launch) is skipped entirely.
+        const isMac = /Mac/i.test(navigator.platform || navigator.userAgent);
+        if (volumes.length > 0 && !isMac) {
             initializeSearchEngine();
         }
     }, [volumes.length]); // Only depend on volumes.length to avoid re-running
@@ -424,7 +440,7 @@ const MainLayout = () => {
         const handleSftpFileOpened = (e) => {
             console.log('SFTP File Opened:', e.detail);
             if (e.detail?.path && e.detail?.content !== undefined) {
-                const fileName = e.detail.path.split('/').pop() || 'Unknown File';
+                const fileName = e.detail.path.split('/').pop() || t('Unknown File');
                 setTextViewerFileName(fileName);
                 setTextViewerContent(e.detail.content);
                 setIsTextViewerOpen(true);
@@ -583,7 +599,7 @@ const MainLayout = () => {
             await navigator.clipboard.writeText(pathToCopy);
             // Show temporary notification
             const notification = document.createElement('div');
-            notification.textContent = 'Path copied to clipboard';
+            notification.textContent = t('Path copied to clipboard');
             notification.style.cssText = `
                 position: fixed;
                 top: 20px;
@@ -636,7 +652,7 @@ const MainLayout = () => {
         } catch (error) {
             console.error('Rename operation failed:', error);
             if (error.message && error.message.includes('already exists')) {
-                const shouldCreateCopy = await showConfirm(`A file named "${newName}" already exists. Create a copy instead?`, 'File Exists');
+                const shouldCreateCopy = await showConfirm(t('A file named "{name}" already exists. Create a copy instead?', { name: newName }), t('File Exists'));
                 if (shouldCreateCopy) {
                     const extension = newName.includes('.') ? newName.split('.').pop() : '';
                     const baseName = extension ? newName.replace(`.${extension}`, '') : newName;
@@ -644,7 +660,7 @@ const MainLayout = () => {
                     handleRename(item, copyName);
                 }
             } else {
-                showError(`Failed to rename: ${error.message || error}`);
+                showError(t('Failed to rename: {error}', { error: error.message || error }));
             }
         }
     };
@@ -695,6 +711,80 @@ const MainLayout = () => {
             console.error('Failed to toggle hidden files setting:', error);
         }
     }, [settings.show_hidden_files_and_folders, updateSetting, currentPath, loadDirectory]);
+
+    /**
+     * Finder keyboard shortcuts for the file view.
+     * Kept in a ref-backed handler so it always sees the latest state.
+     */
+    const shortcutStateRef = React.useRef({});
+    shortcutStateRef.current = {
+        selectedItems, currentPath, focusedItem, copyToClipboard, cutToClipboard, pasteFromClipboard,
+        moveToTrash, showProperties, refreshDirectory, loadDirectory, openFile, goBack, goForward,
+        handleViewModeChange, handleHiddenFilesToggle, currentView,
+    };
+    useEffect(() => {
+        const isTyping = (target) =>
+            target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
+
+        const onKeyDown = async (e) => {
+            const s = shortcutStateRef.current;
+            const mod = e.metaKey || e.ctrlKey;
+            if (!mod || isTyping(e.target) || s.currentView !== 'explorer') return;
+            const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+            const items = s.selectedItems;
+            const isLocal = typeof s.currentPath === 'string' && s.currentPath.startsWith('/');
+            const handled = () => { e.preventDefault(); e.stopPropagation(); };
+
+            if (!e.shiftKey && !e.altKey && key === 'c' && items.length) { handled(); s.copyToClipboard(items); return; }
+            if (!e.shiftKey && !e.altKey && key === 'x' && items.length) { handled(); s.cutToClipboard(items); return; }
+            if (!e.shiftKey && key === 'v') { handled(); await s.pasteFromClipboard(); s.refreshDirectory?.(); return; }
+            // Move to Trash: Cmd+Backspace (recoverable from the Trash, like Finder)
+            if (key === 'Backspace' && items.length) {
+                handled();
+                for (const item of items) {
+                    try { await s.moveToTrash(item.path); } catch (err) { showError(t('Could not move "{name}" to Trash: {error}', { name: item.name, error: err })); }
+                }
+                s.refreshDirectory?.();
+                return;
+            }
+            // Duplicate: Cmd+D
+            if (!e.shiftKey && key === 'd' && items.length && isLocal) {
+                handled();
+                try {
+                    await invoke('transfer_items', { paths: items.map(i => i.path), targetDir: s.currentPath, mode: 'copy' });
+                    s.refreshDirectory?.();
+                } catch (err) { showError(String(err)); }
+                return;
+            }
+            // Get Info: Cmd+I
+            if (!e.shiftKey && key === 'i' && items.length === 1) { handled(); s.showProperties(items[0]); return; }
+            // Refresh: Cmd+R
+            if (!e.shiftKey && key === 'r') { handled(); s.refreshDirectory?.(); return; }
+            // Enclosing folder: Cmd+Up
+            if (key === 'ArrowUp' && isLocal && s.currentPath !== '/') { handled(); s.loadDirectory(getDirectoryPath(s.currentPath)); return; }
+            // Open selection: Cmd+Down
+            if (key === 'ArrowDown' && (s.focusedItem || items[0])) {
+                handled();
+                const item = s.focusedItem || items[0];
+                if (item.isDirectory || 'sub_file_count' in item) s.loadDirectory(item.path); else s.openFile(item.path);
+                return;
+            }
+            // Back / forward: Cmd+[ and Cmd+]
+            if (key === '[') { handled(); s.goBack?.(); return; }
+            if (key === ']') { handled(); s.goForward?.(); return; }
+            // View modes: Cmd+1/2/3
+            if (!e.shiftKey && ['1', '2', '3', '4'].includes(key)) {
+                handled();
+                s.handleViewModeChange({ '1': 'grid', '2': 'list', '3': 'details', '4': 'columns' }[key]);
+                return;
+            }
+            // Show/hide hidden files: Cmd+Shift+.
+            if (e.shiftKey && (key === '.' || key === '>')) { handled(); s.handleHiddenFilesToggle(); }
+        };
+
+        window.addEventListener('keydown', onKeyDown, true);
+        return () => window.removeEventListener('keydown', onKeyDown, true);
+    }, []);
 
     /**
      * File operation handlers - use the existing context menu functionality
@@ -767,8 +857,8 @@ const MainLayout = () => {
             default:
                 return (
                     <div className="files-container">
-                        <div className="action-bar">
-                            <div className="action-bar-left">
+                        <div className="action-bar" data-tauri-drag-region>
+                            <div className="action-bar-left" data-tauri-drag-region>
                                 <CreateFileButton />
                                 
                                 <div className="action-divider"></div>
@@ -777,8 +867,8 @@ const MainLayout = () => {
                                     className="icon-button"
                                     onClick={handleCut}
                                     disabled={selectedItems.length === 0}
-                                    title="Cut (Ctrl+X)"
-                                    aria-label="Cut selected items"
+                                    title={t('Cut (Ctrl+X)')}
+                                    aria-label={t('Cut selected items')}
                                 >
                                     <span className="icon icon-cut"></span>
                                 </button>
@@ -787,8 +877,8 @@ const MainLayout = () => {
                                     className="icon-button"
                                     onClick={handleCopy}
                                     disabled={selectedItems.length === 0}
-                                    title="Copy (Ctrl+C)"
-                                    aria-label="Copy selected items"
+                                    title={t('Copy (Ctrl+C)')}
+                                    aria-label={t('Copy selected items')}
                                 >
                                     <span className="icon icon-copy"></span>
                                 </button>
@@ -797,8 +887,8 @@ const MainLayout = () => {
                                     className="icon-button"
                                     onClick={handlePaste}
                                     disabled={!clipboard.items || clipboard.items.length === 0}
-                                    title="Paste (Ctrl+V)"
-                                    aria-label="Paste items"
+                                    title={t('Paste (Ctrl+V)')}
+                                    aria-label={t('Paste items')}
                                 >
                                     <span className="icon icon-paste"></span>
                                 </button>
@@ -807,8 +897,8 @@ const MainLayout = () => {
                                     className="icon-button"
                                     onClick={handleRenameToolbar}
                                     disabled={selectedItems.length !== 1}
-                                    title="Rename (F2)"
-                                    aria-label="Rename selected item"
+                                    title={t('Rename (F2)')}
+                                    aria-label={t('Rename selected item')}
                                 >
                                     <span className="icon icon-rename"></span>
                                 </button>
@@ -817,8 +907,8 @@ const MainLayout = () => {
                                     className="icon-button"
                                     onClick={handleDelete}
                                     disabled={selectedItems.length === 0}
-                                    title="Delete (Del)"
-                                    aria-label="Delete selected items"
+                                    title={t('Delete (Del)')}
+                                    aria-label={t('Delete selected items')}
                                 >
                                     <span className="icon icon-trash"></span>
                                 </button>
@@ -827,14 +917,15 @@ const MainLayout = () => {
                                     className="icon-button"
                                     onClick={handleProperties}
                                     disabled={selectedItems.length === 0}
-                                    title="Properties (Alt+Enter)"
-                                    aria-label="Show properties"
+                                    title={t('Properties (Alt+Enter)')}
+                                    aria-label={t('Show properties')}
                                 >
                                     <span className="icon icon-properties"></span>
                                 </button>
                             </div>
 
-                            <div className="action-bar-right">
+                            <div className="action-bar-right" data-tauri-drag-region>
+                                {currentView === 'explorer' && <SortFilterMenu />}
                                 {currentView === 'explorer' && (
                                     <ViewModes
                                         currentMode={viewMode}
@@ -845,8 +936,8 @@ const MainLayout = () => {
                                 <button
                                     className="icon-button"
                                     onClick={toggleTheme}
-                                    title={theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
-                                    aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+                                    title={theme === 'light' ? t('Switch to dark theme') : t('Switch to light theme')}
+                                    aria-label={theme === 'light' ? t('Switch to dark theme') : t('Switch to light theme')}
                                 >
                                     <span className={`icon ${theme === 'light' ? 'icon-moon' : 'icon-sun'}`}></span>
                                 </button>
@@ -854,8 +945,8 @@ const MainLayout = () => {
                                 <button
                                     className="icon-button toggle-hidden-files"
                                     onClick={handleHiddenFilesToggle}
-                                    title={`${settings.show_hidden_files_and_folders ? 'Hide' : 'Show'} hidden files and folders`}
-                                    aria-label="Toggle hidden files visibility"
+                                    title={settings.show_hidden_files_and_folders ? t('Hide hidden files and folders') : t('Show hidden files and folders')}
+                                    aria-label={t('Toggle hidden files visibility')}
                                 >
                                     <span className={`icon ${settings.show_hidden_files_and_folders ? 'icon-eye' : 'icon-eye-off'}`}></span>
                                 </button>
@@ -863,23 +954,27 @@ const MainLayout = () => {
                                 <button
                                     className={`icon-button ${isDetailsPanelOpen ? 'active' : ''}`}
                                     onClick={handleDetailsPanelToggle}
-                                    title="Details Panel"
-                                    aria-label="Toggle details panel"
+                                    title={t('Details Panel')}
+                                    aria-label={t('Toggle details panel')}
                                 >
                                     <span className="icon icon-panel-right"></span>
                                 </button>
                             </div>
                         </div>
 
+                        {viewMode === 'columns' && !searchValue ? (
+                            <ColumnView />
+                        ) : (
                         <FileList
                             data={displayData}
                             isLoading={isLoading}
-                            viewMode={viewMode}
+                            viewMode={viewMode === 'columns' ? 'list' : viewMode}
                             isSearching={!!searchValue}
                             searchTerm={searchValue}
                             disableArrowKeys={isPreviewOpen}
                             onColumnsChange={setColumnsPerRow}
                         />
+                        )}
                     </div>
                 );
         }
@@ -897,8 +992,8 @@ const MainLayout = () => {
             {/* Full-width tabs at the top */}
             <TabManager>
                 {/* Full-width toolbar */}
-                <div className="toolbar">
-                        <div className="toolbar-left">
+                <div className="toolbar" data-tauri-drag-region>
+                        <div className="toolbar-left" data-tauri-drag-region>
                             <NavigationButtons />
                             <PathBreadcrumb
                                 onCopyPath={copyCurrentPath}
@@ -906,14 +1001,14 @@ const MainLayout = () => {
                                 onSearch={handleSearch}
                             />
                         </div>
-                        <div className="toolbar-center">
+                        <div className="toolbar-center" data-tauri-drag-region>
                         </div>
-                        <div className="toolbar-right">
+                        <div className="toolbar-right" data-tauri-drag-region>
                             <button
                                 className="icon-button"
                                 onClick={() => setIsGlobalSearchOpen(true)}
-                                title="Global Search (Ctrl+Shift+F)"
-                                aria-label="Global Search"
+                                title={t('Global Search (Ctrl+Shift+F)')}
+                                aria-label={t('Global Search')}
                             >
                                 <span className="icon icon-search-global"></span>
                             </button>

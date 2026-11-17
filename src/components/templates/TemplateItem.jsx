@@ -4,6 +4,7 @@ import IconButton from '../common/IconButton';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import './templates.css';
+import { useI18n, getLanguage, getLocale } from '../../i18n';
 
 /**
  * TemplateItem component - Displays a single template with actions
@@ -21,6 +22,7 @@ import './templates.css';
  */
 const TemplateItem = ({ template, onUse, onRemove }) => {
     const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+    const { t } = useI18n();
 
     // Safety check for template object
     if (!template || typeof template !== 'object') {
@@ -29,7 +31,7 @@ const TemplateItem = ({ template, onUse, onRemove }) => {
     }
 
     // Provide defaults for required properties
-    const safeName = template.name || 'Unknown Template';
+    const safeName = template.name || t('Unknown Template');
     const safePath = template.path || '';
     const safeType = template.type || 'file';
 
@@ -107,10 +109,12 @@ const TemplateItem = ({ template, onUse, onRemove }) => {
      * @returns {string} Formatted size string
      */
     const formatSize = (bytes) => {
-        if (!bytes && bytes !== 0) return 'Unknown size';
-        if (typeof bytes !== 'number') return 'Unknown size';
+        if (!bytes && bytes !== 0) return t('Unknown size');
+        if (typeof bytes !== 'number') return t('Unknown size');
 
-        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const units = getLanguage() === 'ru'
+            ? ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ']
+            : ['B', 'KB', 'MB', 'GB', 'TB'];
         let size = bytes;
         let unitIndex = 0;
 
@@ -119,7 +123,8 @@ const TemplateItem = ({ template, onUse, onRemove }) => {
             unitIndex++;
         }
 
-        return `${size.toFixed(1)} ${units[unitIndex]}`;
+        const formatted = getLanguage() === 'ru' ? size.toFixed(1).replace('.', ',') : size.toFixed(1);
+        return `${formatted} ${units[unitIndex]}`;
     };
 
     /**
@@ -128,20 +133,20 @@ const TemplateItem = ({ template, onUse, onRemove }) => {
      * @returns {string} Formatted date string
      */
     const formatDate = (dateStr) => {
-        if (!dateStr) return 'Unknown date';
+        if (!dateStr) return t('Unknown date');
 
         try {
             const date = new Date(dateStr);
             if (isNaN(date.getTime())) {
-                return 'Invalid date';
+                return t('Invalid date');
             }
-            return date.toLocaleDateString(undefined, {
+            return date.toLocaleDateString(getLocale(), {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric'
             });
         } catch (err) {
-            return 'Invalid date';
+            return t('Invalid date');
         }
     };
 
@@ -185,7 +190,7 @@ const TemplateItem = ({ template, onUse, onRemove }) => {
 
                     <div className="template-meta">
                         <span className="template-type">
-                            {safeType === 'folder' ? 'Folder' : 'File'}
+                            {safeType === 'folder' ? t('Folder') : t('File')}
                         </span>
                         {template.size && (
                             <span className="template-size">{formatSize(template.size)}</span>
@@ -200,8 +205,8 @@ const TemplateItem = ({ template, onUse, onRemove }) => {
                     <button
                         className="template-delete-btn"
                         onClick={handleDeleteClick}
-                        title="Delete template"
-                        aria-label="Delete template"
+                        title={t('Delete template')}
+                        aria-label={t('Delete template')}
                     >
                         <span className="icon icon-delete"></span>
                     </button>
@@ -210,7 +215,7 @@ const TemplateItem = ({ template, onUse, onRemove }) => {
                         size="sm"
                         onClick={handleUseClick}
                     >
-                        Use
+                        {t('Use')}
                     </Button>
                 </div>
             </div>
@@ -219,7 +224,7 @@ const TemplateItem = ({ template, onUse, onRemove }) => {
             <Modal
                 isOpen={isConfirmDeleteOpen}
                 onClose={() => setIsConfirmDeleteOpen(false)}
-                title="Confirm Delete"
+                title={t('Confirm Delete')}
                 size="sm"
                 footer={
                     <>
@@ -227,20 +232,19 @@ const TemplateItem = ({ template, onUse, onRemove }) => {
                             variant="ghost"
                             onClick={() => setIsConfirmDeleteOpen(false)}
                         >
-                            Cancel
+                            {t('Cancel')}
                         </Button>
                         <Button
                             variant="danger"
                             onClick={confirmDelete}
                         >
-                            Delete
+                            {t('Delete')}
                         </Button>
                     </>
                 }
             >
                 <p>
-                    Are you sure you want to delete the template "{safeName}"?
-                    This action cannot be undone.
+                    {t('Are you sure you want to delete the template "{name}"? This action cannot be undone.', { name: safeName })}
                 </p>
             </Modal>
         </>

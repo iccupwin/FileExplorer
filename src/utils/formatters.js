@@ -1,3 +1,5 @@
+import { t, plural, getLanguage, getLocale } from '../i18n';
+
 /**
  * Format a file size in bytes to a human-readable string.
  * @param {number} bytes - The file size in bytes.
@@ -5,15 +7,21 @@
  * @returns {string} The formatted file size.
  */
 export const formatFileSize = (bytes, decimals = 1) => {
-    if (bytes === 0) return '0 Bytes';
+    const ru = getLanguage() === 'ru';
+    const sizes = ru
+        ? ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ', 'ПБ', 'ЭБ', 'ЗБ', 'ЙБ']
+        : ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+
+    if (bytes === 0) return '0 ' + sizes[0];
 
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
 
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    const value = parseFloat((bytes / Math.pow(k, i)).toFixed(dm));
+    // Russian uses a decimal comma
+    return (ru ? String(value).replace('.', ',') : value) + ' ' + sizes[i];
 };
 
 /**
@@ -23,14 +31,14 @@ export const formatFileSize = (bytes, decimals = 1) => {
  * @returns {string} The formatted date.
  */
 export const formatDate = (dateString, includeTime = false) => {
-    if (!dateString) return 'Unknown';
+    if (!dateString) return t('Unknown');
 
     try {
         const date = new Date(dateString);
 
         // Check if the date is valid
         if (isNaN(date.getTime())) {
-            return 'Invalid date';
+            return t('Invalid date');
         }
 
         const options = {
@@ -42,13 +50,13 @@ export const formatDate = (dateString, includeTime = false) => {
         if (includeTime) {
             options.hour = '2-digit';
             options.minute = '2-digit';
-            options.hour12 = true;
+            options.hour12 = getLanguage() !== 'ru';
         }
 
-        return new Intl.DateTimeFormat('en-US', options).format(date);
+        return new Intl.DateTimeFormat(getLocale(), options).format(date);
     } catch (error) {
         console.error('Error formatting date:', error);
-        return 'Invalid date';
+        return t('Invalid date');
     }
 };
 
@@ -59,7 +67,7 @@ export const formatDate = (dateString, includeTime = false) => {
  */
 export const getFileType = (filename) => {
     if (!filename || !filename.includes('.')) {
-        return 'File';
+        return t('File');
     }
 
     const extension = filename.split('.').pop().toLowerCase();
@@ -155,7 +163,8 @@ export const getFileType = (filename) => {
         'torrent': 'Torrent File',
     };
 
-    return fileTypes[extension] || `${extension.toUpperCase()} File`;
+    if (fileTypes[extension]) return t(fileTypes[extension]);
+    return t('{ext} File', { ext: extension.toUpperCase() });
 };
 
 /**
@@ -164,7 +173,7 @@ export const getFileType = (filename) => {
  * @returns {string} The elapsed time as a human-readable string.
  */
 export const calculateTimeElapsed = (dateString) => {
-    if (!dateString) return 'Unknown';
+    if (!dateString) return t('Unknown');
 
     try {
         const date = new Date(dateString);
@@ -172,39 +181,39 @@ export const calculateTimeElapsed = (dateString) => {
 
         // Check if the date is valid
         if (isNaN(date.getTime())) {
-            return 'Invalid date';
+            return t('Invalid date');
         }
 
         const seconds = Math.floor((now - date) / 1000);
 
         if (seconds < 60) {
-            return 'Just now';
+            return t('Just now');
         }
 
         const minutes = Math.floor(seconds / 60);
         if (minutes < 60) {
-            return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+            return plural(minutes, { en: ['{count} minute ago', '{count} minutes ago'], ru: ['{count} минуту назад', '{count} минуты назад', '{count} минут назад'] });
         }
 
         const hours = Math.floor(minutes / 60);
         if (hours < 24) {
-            return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+            return plural(hours, { en: ['{count} hour ago', '{count} hours ago'], ru: ['{count} час назад', '{count} часа назад', '{count} часов назад'] });
         }
 
         const days = Math.floor(hours / 24);
         if (days < 30) {
-            return `${days} day${days === 1 ? '' : 's'} ago`;
+            return plural(days, { en: ['{count} day ago', '{count} days ago'], ru: ['{count} день назад', '{count} дня назад', '{count} дней назад'] });
         }
 
         const months = Math.floor(days / 30);
         if (months < 12) {
-            return `${months} month${months === 1 ? '' : 's'} ago`;
+            return plural(months, { en: ['{count} month ago', '{count} months ago'], ru: ['{count} месяц назад', '{count} месяца назад', '{count} месяцев назад'] });
         }
 
         const years = Math.floor(months / 12);
-        return `${years} year${years === 1 ? '' : 's'} ago`;
+        return plural(years, { en: ['{count} year ago', '{count} years ago'], ru: ['{count} год назад', '{count} года назад', '{count} лет назад'] });
     } catch (error) {
         console.error('Error calculating time elapsed:', error);
-        return 'Unknown';
+        return t('Unknown');
     }
 };

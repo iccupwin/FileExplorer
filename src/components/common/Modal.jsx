@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import Icon from './Icon';
 import './common.css';
+import { useI18n } from '../../i18n';
 
 /**
  * Modal component
@@ -32,6 +33,7 @@ const Modal = ({
                    ...rest
                }) => {
     const modalRef = useRef(null);
+    const { t } = useI18n();
 
     // Close modal when Escape key is pressed
     useEffect(() => {
@@ -121,7 +123,7 @@ const Modal = ({
                             <button
                                 className="modal-close"
                                 onClick={onClose}
-                                aria-label="Close modal"
+                                aria-label={t('Close modal')}
                             >
                                 <Icon name="x" />
                             </button>

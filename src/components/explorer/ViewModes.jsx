@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../../i18n';
 import './viewModes.css';
 
 /**
@@ -9,6 +10,7 @@ import './viewModes.css';
  * @returns {React.ReactElement} ViewModes component
  */
 const ViewModes = ({ currentMode = 'grid', onChange }) => {
+    const { t } = useI18n();
     /**
      * Available view modes configuration
      * @type {Array<{id: string, label: string, icon: string}>}
@@ -17,6 +19,7 @@ const ViewModes = ({ currentMode = 'grid', onChange }) => {
         { id: 'grid', label: 'Grid View', icon: 'grid' },
         { id: 'list', label: 'List View', icon: 'list' },
         { id: 'details', label: 'Details View', icon: 'details' },
+        { id: 'columns', label: 'Column View', icon: 'columns' },
     ];
 
     /**
@@ -36,8 +39,8 @@ const ViewModes = ({ currentMode = 'grid', onChange }) => {
                     key={mode.id}
                     className={`view-mode-button ${currentMode === mode.id ? 'active' : ''}`}
                     onClick={() => handleViewModeChange(mode.id)}
-                    aria-label={mode.label}
-                    title={mode.label}
+                    aria-label={t(mode.label)}
+                    title={t(mode.label)}
                 >
                     <span className={`icon icon-${mode.icon}`}></span>
                 </button>

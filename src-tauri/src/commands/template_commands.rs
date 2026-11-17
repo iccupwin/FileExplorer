@@ -141,7 +141,7 @@ pub async fn add_template_impl(
 
     // Update the template paths in the metadata state
     let update_result = {
-        let metadata_state = state.lock().unwrap();
+        let metadata_state = state.lock().unwrap_or_else(|e| e.into_inner());
         metadata_state.update_template_paths()
     };
 
@@ -287,7 +287,7 @@ pub async fn remove_template_impl(
 
             // Update the template paths in the metadata state
             let update_result = {
-                let metadata_state = state.lock().unwrap();
+                let metadata_state = state.lock().unwrap_or_else(|e| e.into_inner());
                 metadata_state.update_template_paths()
             };
 
@@ -316,7 +316,7 @@ pub async fn remove_template_impl(
 async fn get_template_paths_from_state(
     state: Arc<Mutex<MetaDataState>>,
 ) -> Result<Vec<PathBuf>, ()> {
-    let meta_data_state = state.lock().unwrap();
+    let meta_data_state = state.lock().unwrap_or_else(|e| e.into_inner());
     let inner_meta_data = meta_data_state
         .0
         .lock()
@@ -434,10 +434,13 @@ pub async fn copy_to_dest_path(source_path: &str, dest_path: &str) -> Result<u64
             } else if entry_path.is_dir() {
                 // Recursively copy subdirectory - pass the dest_path_entry as destination
                 log_info!("Recursively copying subdirectory: {}", entry_path.display());
-                match Box::pin(copy_to_dest_path(
-                    entry_path.to_str().unwrap(),
-                    dest_path_entry.parent().unwrap().to_str().unwrap(),
-                ))
+                let (Some(entry_str), Some(parent_str)) = (
+                    entry_path.to_str(),
+                    dest_path_entry.parent().and_then(|p| p.to_str()),
+                ) else {
+                    return Err(format!("Unsupported path: {}", entry_path.display()));
+                };
+                match Box::pin(copy_to_dest_path(entry_str, parent_str))
                 .await
                 {
                     Ok(sub_size) => {
@@ -496,7 +499,7 @@ pub async fn copy_to_dest_path(source_path: &str, dest_path: &str) -> Result<u64
         }
 
         // Copy the file to the final destination path
-        match fs::copy(source_path, final_dest_path.to_str().unwrap()) {
+        match fs::copy(source_path, &final_dest_path) {
             Ok(size) => {
                 log_info!(
                     "Copied file: {} to {} ({} bytes)",
@@ -587,7 +590,7 @@ mod tests_template_commands {
 
         // Update template paths in state - this should find our newly created templates
         {
-            let meta_state = state.lock().unwrap();
+            let meta_state = state.lock().unwrap_or_else(|e| e.into_inner());
             log_info!("Templates dir: {:?}", templates_dir.path());
 
             let inner_meta_data = &mut meta_state.0.lock().unwrap();
@@ -790,7 +793,7 @@ mod tests_template_commands {
             .expect("Failed to create test file in template");
 
         // Update template paths in state
-        let meta_state = state.lock().unwrap();
+        let meta_state = state.lock().unwrap_or_else(|e| e.into_inner());
         meta_state
             .update_template_paths()
             .expect("Failed to update template paths");

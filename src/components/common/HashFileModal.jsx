@@ -5,6 +5,7 @@ import { useFileSystem } from '../../providers/FileSystemProvider';
 import { showError, showSuccess } from '../../utils/NotificationSystem';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
+import { useI18n } from '../../i18n';
 
 /**
  * Modal component for generating a hash file for a selected file or directory
@@ -18,6 +19,7 @@ import Button from '../common/Button';
  */
 const HashFileModal = ({ isOpen, onClose, item }) => {
     const [fileName, setFileName] = useState('');
+    const { t } = useI18n();
     const [isGenerating, setIsGenerating] = useState(false);
     const inputRef = useRef(null);
     const { currentPath } = useHistory();
@@ -63,11 +65,11 @@ const HashFileModal = ({ isOpen, onClose, item }) => {
             });
 
             await loadDirectory(currentPath);
-            showSuccess(`Hash generated and saved to ${fileName}: ${hash.substring(0, 16)}...`);
+            showSuccess(t('Hash generated and saved to {file}: {hash}...', { file: fileName, hash: hash.substring(0, 16) }));
             onClose();
         } catch (error) {
             console.error('Hash generation to file failed:', error);
-            showError(`Failed to generate hash file: ${error.message || error}`);
+            showError(t('Failed to generate hash file: {error}', { error: error.message || error }));
         } finally {
             setIsGenerating(false);
         }
@@ -97,7 +99,7 @@ const HashFileModal = ({ isOpen, onClose, item }) => {
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title="Generate Hash to File"
+            title={t('Generate Hash to File')}
             size="sm"
             footer={
                 <>
@@ -106,7 +108,7 @@ const HashFileModal = ({ isOpen, onClose, item }) => {
                         onClick={onClose}
                         disabled={isGenerating}
                     >
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                     <Button
                         type="submit"
@@ -114,7 +116,7 @@ const HashFileModal = ({ isOpen, onClose, item }) => {
                         disabled={!fileName.trim() || isGenerating}
                         onClick={handleSubmit}
                     >
-                        {isGenerating ? 'Generating...' : 'Generate Hash'}
+                        {isGenerating ? t('Generating...') : t('Generate Hash')}
                     </Button>
                 </>
             }
@@ -122,7 +124,7 @@ const HashFileModal = ({ isOpen, onClose, item }) => {
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
                     <label htmlFor="hash-filename">
-                        Hash file name:
+                        {t('Hash file name:')}
                     </label>
                     <input
                         ref={inputRef}
@@ -132,11 +134,11 @@ const HashFileModal = ({ isOpen, onClose, item }) => {
                         onChange={handleChange}
                         onKeyDown={handleKeyDown}
                         className="input"
-                        placeholder="Enter hash file name"
+                        placeholder={t('Enter hash file name')}
                         disabled={isGenerating}
                     />
                     <div className="input-hint">
-                        The hash will be generated for "{item.name}" and saved to this file.
+                        {t('The hash will be generated for "{name}" and saved to this file.', { name: item.name })}
                     </div>
                 </div>
             </form>

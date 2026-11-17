@@ -16,18 +16,28 @@ import "./styles/components.css";
 // 5. Modern enhancements and effects
 import "./styles/modern.css";
 
-// Import font (Inter)
-// For production, consider using a font loading strategy or self-hosting the font
-const fontLink = document.createElement('link');
-fontLink.rel = 'stylesheet';
-fontLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap';
-document.head.appendChild(fontLink);
+// 6. Finder look (loaded last so it wins over component styles)
+import "./styles/finder.css";
 
 // Stelle sicher, dass window.invoke verfügbar ist, falls du es global verwendest
 window.__TAURI_INVOKE__ = invoke;
 
 // Initialize the application
-ReactDOM.createRoot(document.getElementById("root")).render(
+// Show crashes instead of an empty window
+const showFatalError = (error) => {
+    const root = document.getElementById("root");
+    if (!root) return;
+    const message = (error && (error.stack || error.message)) || String(error);
+    root.innerHTML = '';
+    const box = document.createElement('pre');
+    box.style.cssText = 'margin:60px 24px;padding:16px;white-space:pre-wrap;font:12px ui-monospace,Menlo,monospace;color:#ff6b6b;background:rgba(255,0,0,0.06);border-radius:8px;';
+    box.textContent = 'Explr crashed:\n\n' + message;
+    root.appendChild(box);
+};
+
+ReactDOM.createRoot(document.getElementById("root"), {
+    onUncaughtError: (error) => showFatalError(error),
+}).render(
     <React.StrictMode>
         <App />
     </React.StrictMode>

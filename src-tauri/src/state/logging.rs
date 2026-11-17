@@ -398,7 +398,7 @@ impl Logger {
 
         let metadata = fs::metadata(path).ok();
         let file_size = metadata.map(|m| m.len()).unwrap_or(0);
-        let _guard = WRITE_LOCK.lock().unwrap();
+        let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
         // If file size exceeds the limit, truncate before writing new entry
         let max_log_size = match self.state.lock() {

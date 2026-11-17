@@ -4,6 +4,7 @@ import { useHistory } from '../../providers/HistoryProvider';
 import { useFileSystem } from '../../providers/FileSystemProvider';
 import { useSettings } from '../../providers/SettingsProvider';
 import Icon from '../common/Icon';
+import { useI18n } from '../../i18n';
 import './terminal.css';
 
 /**
@@ -16,6 +17,7 @@ import './terminal.css';
  * @returns {React.ReactElement} Terminal component
  */
 const Terminal = ({ isOpen, onToggle }) => {
+    const { t } = useI18n();
     const [commandHistory, setCommandHistory] = useState([]);
     const [currentCommand, setCurrentCommand] = useState('');
     const [historyIndex, setHistoryIndex] = useState(-1);
@@ -1101,20 +1103,20 @@ Use Ctrl+R for reverse search, Ctrl+C to interrupt commands.`,
         <div className="enhanced-terminal" style={{ height: `${terminalHeight}px` }}>
             <div className="terminal-header">
                 <div className="terminal-title">
-                    <span>Terminal</span>
+                    <span>{t('Terminal')}</span>
                 </div>
                 <div className="terminal-controls">
                     <button 
                         className="terminal-control terminal-clear"
                         onClick={handleClearTerminal}
-                        title="Clear terminal"
+                        title={t('Clear terminal')}
                     >
                         <Icon name="trash" size="small" className="terminal-icon" />
                     </button>
                     <button 
                         className="terminal-control terminal-close"
                         onClick={onToggle}
-                        title="Close terminal"
+                        title={t('Close terminal')}
                     >
                         <Icon name="x" size="small" className="terminal-icon" />
                     </button>
@@ -1176,12 +1178,12 @@ Use Ctrl+R for reverse search, Ctrl+C to interrupt commands.`,
                         spellCheck="false"
                         autoComplete="off"
                         autoCapitalize="off"
-                        placeholder={isSearchMode ? "Start typing to search history..." : ""}
+                        placeholder={isSearchMode ? t('Start typing to search history…') : ""}
                     />
                     {!isSearchMode && isExecuting && (
                         <span className="terminal-executing">
                             <span className="spinner-small"></span>
-                            <span className="terminal-interrupt-hint">⏱️ Running... Press Ctrl+C to interrupt</span>
+                            <span className="terminal-interrupt-hint">⏱️ {t('Running… Press Ctrl+C to interrupt')}</span>
                         </span>
                     )}
                 </form>

@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { useI18n } from '../../i18n';
 
 /**
  * Single context menu item that can render both main menu items and submenu items
@@ -23,6 +24,7 @@ const ContextMenuItem = ({
                              onSubmenuClose,
                              onAction,
                          }) => {
+    const { t } = useI18n();
     const [submenuPosition, setSubmenuPosition] = useState({ x: 0, y: 0, alignLeft: false });
     const itemRef = useRef(null);
 
@@ -121,7 +123,7 @@ const ContextMenuItem = ({
             )}
 
             {/* Label */}
-            <span className="context-menu-label">{item.label}</span>
+            <span className="context-menu-label">{t(item.label)}</span>
 
             {/* Shortcut */}
             {item.shortcut && (

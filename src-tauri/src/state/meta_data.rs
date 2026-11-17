@@ -70,17 +70,13 @@ fn load_templates() -> Vec<PathBuf> {
     let templates_path = constants::TEMPLATES_ABS_PATH_FOLDER.to_path_buf();
     if templates_path.exists() {
         fs::read_dir(templates_path)
-            .unwrap()
-            .filter_map(|entry| entry.ok())
-            .map(|entry| entry.path())
-            .collect()
+            .map(|entries| entries.filter_map(|entry| entry.ok()).map(|entry| entry.path()).collect())
+            .unwrap_or_default()
     } else {
         //create the empty folder
-        fs::create_dir_all(templates_path)
-            .map_err(|e| {
-                log_error!("Failed to create templates folder. Error: {}", e);
-            })
-            .unwrap();
+        if let Err(e) = fs::create_dir_all(templates_path) {
+            log_error!("Failed to create templates folder. Error: {}", e);
+        }
         vec![]
     }
 }

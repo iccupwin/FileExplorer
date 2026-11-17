@@ -3,6 +3,8 @@ import Icon from '../common/Icon';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import Modal from '../common/Modal';
 import './PreviewModal.css';
+import { useI18n, getLocale } from '../../i18n';
+import { formatFileSize as formatLocalizedFileSize } from '../../utils/formatters';
 
 /**
  * PreviewModal component - Displays file/folder previews in a modal
@@ -13,6 +15,7 @@ import './PreviewModal.css';
  * @returns {React.ReactElement|null} PreviewModal component or null
  */
 export function PreviewModal({ payload, onClose, isLoading }) {
+  const { t } = useI18n();
   if (!payload && !isLoading) return null;
 
   return (
@@ -22,7 +25,7 @@ export function PreviewModal({ payload, onClose, isLoading }) {
           <button 
             onClick={onClose} 
             className="preview-modal-close"
-            aria-label="Close preview"
+            aria-label={t('Close preview')}
             style={{ marginRight: 0 }}
           >
             <span className="icon icon-x"></span>
@@ -38,7 +41,7 @@ export function PreviewModal({ payload, onClose, isLoading }) {
           {isLoading ? (
             <div className="preview-loading">
               <div className="spinner"></div>
-              <p>Loading preview...</p>
+              <p>{t('Loading preview...')}</p>
             </div>
           ) : (
             <PreviewContent payload={payload} />
@@ -56,6 +59,7 @@ export function PreviewModal({ payload, onClose, isLoading }) {
  * @returns {React.ReactElement} Preview content
  */
 function PreviewContent({ payload }) {
+  const { t } = useI18n();
   if (!payload) return null;
 
   switch (payload.kind) {
@@ -70,18 +74,18 @@ function PreviewContent({ payload }) {
             </div>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: 8 }}>
               <div style={{ fontWeight: 600, fontSize: '2rem', color: 'var(--text-primary, #1a1a1a)', alignSelf: 'flex-start' }}>
-                {payload.name || 'Folder'}
+                {payload.name || t('Folder')}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '2.5rem', marginTop: 8 }}>
                 <div style={{ fontSize: '1.1rem', color: 'var(--text-secondary, #666)' }}>
-                  <span style={{ fontWeight: 500 }}>Size:</span> {typeof payload.size === 'number' ? formatFileSize(payload.size) : '—'}
+                  <span style={{ fontWeight: 500 }}>{t('Size:')}</span> {typeof payload.size === 'number' ? formatFileSize(payload.size) : '—'}
                 </div>
                 <div style={{ fontSize: '1.1rem', color: 'var(--text-secondary, #666)' }}>
-                  <span style={{ fontWeight: 500 }}>Items:</span> {typeof payload.item_count === 'number' ? payload.item_count : (payload.itemCount ? payload.itemCount : (payload.entries ? payload.entries.length : '—'))}
+                  <span style={{ fontWeight: 500 }}>{t('Items:')}</span> {typeof payload.item_count === 'number' ? payload.item_count : (payload.itemCount ? payload.itemCount : (payload.entries ? payload.entries.length : '—'))}
                 </div>
               </div>
               <div style={{ fontSize: '1.1rem', color: 'var(--text-secondary, #666)', marginTop: 8 }}>
-                <span style={{ fontWeight: 500 }}>Last Modified:</span> {payload.modified ? (new Date(payload.modified)).toLocaleString() : '—'}
+                <span style={{ fontWeight: 500 }}>{t('Last Modified:')}</span> {payload.modified ? (new Date(payload.modified)).toLocaleString(getLocale()) : '—'}
               </div>
             </div>
           </div>
@@ -131,7 +135,7 @@ function PreviewContent({ payload }) {
             className="preview-video"
             preload="metadata"
           >
-            Your browser does not support video preview.
+            {t('Your browser does not support video preview.')}
           </video>
         </div>
       );
@@ -148,7 +152,7 @@ function PreviewContent({ payload }) {
               className="preview-audio"
               preload="metadata"
             >
-              Your browser does not support audio preview.
+              {t('Your browser does not support audio preview.')}
             </audio>
           </div>
         </div>
@@ -168,7 +172,7 @@ function PreviewContent({ payload }) {
           </pre>
           {payload.truncated && (
             <div className="preview-text-truncated">
-              <p>Content truncated for performance. Open file to view complete content.</p>
+              <p>{t('Content truncated for performance. Open file to view complete content.')}</p>
             </div>
           )}
         </div>
@@ -179,7 +183,7 @@ function PreviewContent({ payload }) {
       return (
         <div className="preview-unknown">
           <div className="preview-unknown-icon">📁</div>
-          <p>Preview not available for this item.</p>
+          <p>{t('Preview not available for this item.')}</p>
           <button 
             onClick={() => {
               // You could implement an "Open in default app" feature here
@@ -187,7 +191,7 @@ function PreviewContent({ payload }) {
             }}
             className="btn btn-secondary"
           >
-            Open in Default App
+            {t('Open in Default App')}
           </button>
         </div>
       );
@@ -196,7 +200,7 @@ function PreviewContent({ payload }) {
       return (
         <div className="preview-error">
           <div className="preview-error-icon">⚠️</div>
-          <h3>Preview Error</h3>
+          <h3>{t('Preview Error')}</h3>
           <p>{payload.message}</p>
         </div>
       );
@@ -204,7 +208,7 @@ function PreviewContent({ payload }) {
     default:
       return (
         <div className="preview-unknown">
-          <p>Unknown preview type.</p>
+          <p>{t('Unknown preview type.')}</p>
         </div>
       );
   }
@@ -216,13 +220,7 @@ function PreviewContent({ payload }) {
  * @returns {string} Formatted file size
  */
 function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return formatLocalizedFileSize(bytes, 2);
 }
 
 export default PreviewModal;

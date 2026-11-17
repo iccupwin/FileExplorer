@@ -4,21 +4,24 @@ use std::sync::LazyLock;
 
 pub static VERSION: &str = "0.2.3";
 
-pub static CONFIG_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
-    env::current_dir()
-        .expect("Could not determine current path")
-        .join("config")
-});
+/// Base folder for config and logs: the current dir (main() switches it to
+/// ~/Library/Application Support/com.explr.app), or that folder directly if the
+/// current dir is unavailable.
+fn data_dir() -> PathBuf {
+    env::current_dir().unwrap_or_else(|_| {
+        env::var_os("HOME")
+            .map(|h| PathBuf::from(h).join("Library/Application Support/com.explr.app"))
+            .unwrap_or_else(env::temp_dir)
+    })
+}
+
+pub static CONFIG_PATH: LazyLock<PathBuf> = LazyLock::new(|| data_dir().join("config"));
 
 pub static META_DATA_CONFIG_ABS_PATH: LazyLock<PathBuf> =
     LazyLock::new(|| CONFIG_PATH.join(META_DATA_CONFIG_FILE_NAME));
 
 
-pub static LOG_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
-    env::current_dir()
-        .expect("Could not determine current path")
-        .join("logs")
-});
+pub static LOG_PATH: LazyLock<PathBuf> = LazyLock::new(|| data_dir().join("logs"));
 
 
 pub static META_DATA_CONFIG_FILE_NAME: &str = "meta_data.json";

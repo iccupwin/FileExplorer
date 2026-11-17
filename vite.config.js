@@ -4,8 +4,12 @@ import react from "@vitejs/plugin-react";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(async ({ mode }) => ({
   plugins: [react()],
+
+  // Production builds drop debug logging (hundreds of console.log calls slow down
+  // large folder listings); warnings and errors are kept.
+  esbuild: mode === "production" ? { pure: ["console.log", "console.debug", "console.info"] } : {},
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

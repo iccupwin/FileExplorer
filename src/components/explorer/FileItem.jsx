@@ -1,12 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import FileIcon from './FileIcon';
 import { formatFileSize, formatDate, getFileType } from '../../utils/formatters';
-import { replaceFileName } from '../../utils/pathUtils.js';
-import { invoke } from '@tauri-apps/api/core';
-import { useFileSystem } from '../../providers/FileSystemProvider';
-import { useHistory } from '../../providers/HistoryProvider';
-import { useContextMenu } from '../../providers/ContextMenuProvider';
-import { showError, showConfirm } from '../../utils/NotificationSystem';
+import { useI18n } from '../../i18n';
+import Thumbnail, { getThumbnailKind } from './Thumbnail';
 import './fileItem.css';
 
 /**
@@ -19,6 +15,11 @@ import './fileItem.css';
  * @param {Function} props.onClick - Click handler function
  * @param {Function} props.onDoubleClick - Double-click handler function
  * @param {Function} props.onContextMenu - Context menu handler function
+ * @param {number} props.index - Position in the displayed list
+ * @param {boolean} [props.isCut=false] - Whether the item is cut to the clipboard
+ *
+ * Handlers are called as handler(event, item, index) so the parent can pass
+ * stable functions; together with React.memo only changed items re-render.
  * @returns {React.ReactElement} File/directory item component
  */
 const FileItem = ({
@@ -28,73 +29,31 @@ const FileItem = ({
                       isFocused = false,
                       onClick,
                       onDoubleClick,
-                      onContextMenu
+                      onContextMenu,
+                      onMouseDown: onItemMouseDown,
+                      index = 0,
+                      isCut = false
                   }) => {
-    const { loadDirectory } = useFileSystem();
-    const { currentPath } = useHistory();
-    const { clipboard } = useContextMenu();
+    const { t } = useI18n();
 
     const isDirectory = item.isDirectory || 'sub_file_count' in item;
-    const fileType = isDirectory ? 'Folder' : getFileType(item.name);
-    const size = isDirectory
-        ? `${item.sub_file_count || 0} items`
-        : formatFileSize(item.size_in_bytes);
+    const fileType = isDirectory ? t('Folder') : getFileType(item.name);
+    // Like Finder, folders show no size in lists (counting them is slow)
+    const size = isDirectory ? '—' : formatFileSize(item.size_in_bytes);
 
-    // Check if this item is cut (in clipboard with cut operation)
-    const isCut = clipboard.operation === 'cut' && 
-                  clipboard.items.some(clipItem => clipItem.path === item.path);
+    // Finder-style thumbnails for images, PDFs and videos (grid view)
+    const thumbnailKind = getThumbnailKind(item, isDirectory);
 
     // Format modified date
     const modified = formatDate(item.last_modified);
 
 
     /**
-     * Handles the rename operation with robust path handling
-     * @param {Object} item - The item to rename
-     * @param {string} newName - The new name for the item
-     */
-    const handleRename = async (item, newName) => {
-        if (!newName || newName === item.name) return;
-
-        try {
-            // Use the robust path utility to create the new path
-            const newPath = replaceFileName(item.path, newName);
-
-            console.log(`Renaming: "${item.path}" -> "${newPath}"`);
-
-            await invoke('rename', {
-                oldPath: item.path,
-                newPath: newPath
-            });
-
-            console.log('Rename operation completed successfully');
-
-            // Reload current directory
-            if (currentPath) {
-                await loadDirectory(currentPath);
-            }
-        } catch (error) {
-            console.error('Rename operation failed:', error);
-            if (error.message && error.message.includes('already exists')) {
-                const shouldCreateCopy = await showConfirm(`A file named "${newName}" already exists. Create a copy instead?`, 'File Exists');
-                if (shouldCreateCopy) {
-                    const extension = newName.includes('.') ? newName.split('.').pop() : '';
-                    const baseName = extension ? newName.replace(`.${extension}`, '') : newName;
-                    const copyName = extension ? `${baseName} - Copy.${extension}` : `${baseName} - Copy`;
-                    handleRename(item, copyName);
-                }
-            } else {
-                showError(`Failed to rename: ${error.message || error}`);
-            }
-        }
-    };
-
-    /**
      * Handles click events on the file item
      * @param {React.MouseEvent} e - The click event
      */
     const handleClick = (e) => {
-        if (onClick) onClick(e);
+        if (onClick) onClick(e, item, index);
     };
 
     /**
@@ -104,6 +63,7 @@ const FileItem = ({
     const handleMouseDown = (e) => {
         // Prevent text selection on mouse down
         e.preventDefault();
+        if (onItemMouseDown) onItemMouseDown(e, item, index);
     };
 
     /**
@@ -130,7 +90,7 @@ const FileItem = ({
             window.getSelection().removeAllRanges();
         }
         
-        if (onDoubleClick) onDoubleClick(e);
+        if (onDoubleClick) onDoubleClick(e, item, index);
     };
 
     /**
@@ -155,7 +115,15 @@ const FileItem = ({
                 {viewMode === 'grid' && (
                     <div className="file-item-grid">
                         <div className="file-icon-container">
-                            <FileIcon filename={item.name} isDirectory={isDirectory} />
+                            {thumbnailKind ? (
+                                <Thumbnail
+                                    item={item}
+                                    kind={thumbnailKind}
+                                    fallback={<FileIcon filename={item.name} isDirectory={isDirectory} path={item.path} iconSize={128} />}
+                                />
+                            ) : (
+                                <FileIcon filename={item.name} isDirectory={isDirectory} path={item.path} iconSize={128} />
+                            )}
                         </div>
 
                         <div className="file-name truncate" title={item.name}>
@@ -167,7 +135,7 @@ const FileItem = ({
                 {viewMode === 'list' && (
                     <div className="file-item-list">
                         <div className="file-icon-container">
-                            <FileIcon filename={item.name} isDirectory={isDirectory} />
+                            <FileIcon filename={item.name} isDirectory={isDirectory} path={item.path} iconSize={32} />
                         </div>
 
                         <div className="file-details">
@@ -185,7 +153,7 @@ const FileItem = ({
                     <div className="file-item-details">
                         <div className="file-column column-name">
                             <div className="file-icon-container">
-                                <FileIcon filename={item.name} isDirectory={isDirectory} />
+                                <FileIcon filename={item.name} isDirectory={isDirectory} path={item.path} iconSize={32} />
                             </div>
 
                             <div className="file-name truncate" title={item.name}>
@@ -212,4 +180,4 @@ const FileItem = ({
     );
 };
 
-export default FileItem;
+export default React.memo(FileItem);

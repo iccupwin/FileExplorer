@@ -18,6 +18,7 @@ pub enum DefaultView {
     grid,
     list,
     details,
+    columns,
 }
 
 /// Font size setting for UI elements.

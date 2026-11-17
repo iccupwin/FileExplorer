@@ -1,5 +1,5 @@
 use crate::models::{
-    format_system_time, get_access_permission_number, get_access_permission_string,
+    date_added_string, format_system_time, get_access_permission_number, get_access_permission_string,
 };
 use serde::{Deserialize, Serialize};
 use std::fs::DirEntry;
@@ -15,6 +15,9 @@ pub struct File {
     pub created: String,
     pub last_modified: String,
     pub accessed: String,
+    /// When the item was added to its folder (macOS "Date Added"); falls back to `created`
+    #[serde(default)]
+    pub date_added: String,
 }
 
 impl File {
@@ -39,6 +42,7 @@ impl File {
             created: format_system_time(metadata.created()?),
             last_modified: format_system_time(metadata.modified()?),
             accessed: format_system_time(metadata.accessed()?),
+            date_added: date_added_string(&path_of_entry, &metadata),
         })
     }
 }

@@ -72,9 +72,8 @@ pub fn get_system_volumes_information() -> Vec<VolumeInformation> {
             mount_point: disk.mount_point().to_string_lossy().into_owned(), // Convert mount point
             file_system: disk
                 .file_system()
-                .to_str()
-                .expect("Error during parsing the given string from file_system")
-                .to_owned(), // Convert file system
+                .to_string_lossy()
+                .into_owned(), // Convert file system (never panics on odd names)
             size: disk.total_space(),
             available_space: disk.available_space(),
             is_removable: disk.is_removable(),

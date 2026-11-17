@@ -14,7 +14,23 @@
       "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; media-src 'self' asset: http://asset.localhost; frame-src 'self' asset: http://asset.localhost data: blob; object-src 'self' asset: http://asset.localhost data: blob",
       "assetProtocol": {
         "enable": true,
-        "scope": ["*/**"]
+        "scope": {
+          "allow": [
+            "*/**"
+          ],
+          "deny": [
+            "$HOME/.ssh/**",
+            "$HOME/.aws/**",
+            "$HOME/.gnupg/**",
+            "$HOME/.config/gcloud/**",
+            "$HOME/Library/Keychains/**",
+            "$HOME/Library/Cookies/**",
+            "$HOME/Library/Application Support/Google/Chrome/**",
+            "$HOME/Library/Application Support/Firefox/**",
+            "$HOME/Library/Messages/**",
+            "$HOME/Library/Mail/**"
+          ]
+        }
       }
     },
     "withGlobalTauri": false,
@@ -26,14 +42,32 @@
         "height": 800,
         "resizable": true,
         "visible": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 20,
+          "y": 22
+        },
+        "minWidth": 720,
+        "minHeight": 440
       }
     ]
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "rpm", "dmg", "msi"],
-    "icon": ["icons/logo_32x32.png", "icons/logo_128x128.png", "icons/logo.icns", "icons/logo.ico"],
+    "targets": [
+      "deb",
+      "rpm",
+      "dmg",
+      "msi"
+    ],
+    "icon": [
+      "icons/logo_32x32.png",
+      "icons/logo_128x128.png",
+      "icons/logo.icns",
+      "icons/logo.ico"
+    ],
     "windows": {
       "wix": {
         "language": "en-US"

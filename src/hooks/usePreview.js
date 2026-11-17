@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState, useCallback } from 'react';
 import { useSftp } from '../providers/SftpProvider';
+import { t } from '../i18n';
 
 /**
  * Hook for managing file/folder preview functionality
@@ -54,8 +55,8 @@ export function usePreview(getFocusedItem, navigateUp = null, navigateDown = nul
       console.error('Failed to build preview:', error);
       setPayload({
         kind: 'Error',
-        name: path.split(/[/\\]/).pop() || 'Unknown',
-        message: error instanceof Error ? error.message : 'Failed to generate preview'
+        name: path.split(/[/\\]/).pop() || t('Unknown'),
+        message: error instanceof Error ? t(error.message) : t('Failed to generate preview')
       });
       setOpen(true);
     } finally {

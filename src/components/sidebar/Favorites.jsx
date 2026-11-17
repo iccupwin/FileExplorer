@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import SidebarItem from './SidebarItem';
+import { useI18n } from '../../i18n';
 
 /**
  * Favorites component - Displays and manages favorite locations
@@ -21,6 +22,7 @@ const Favorites = ({
                        currentView,
                        currentPath
                    }) => {
+    const { t } = useI18n();
     const [favorites, setFavorites] = useState([]);
 
     /**
@@ -78,7 +80,7 @@ const Favorites = ({
     const handleContextMenu = (e, item) => {
         e.preventDefault();
 
-        const choice = confirm('Remove from favorites?');
+        const choice = confirm(t('Remove from favorites?'));
         if (choice) {
             onRemove(item.path);
         }
@@ -94,8 +96,8 @@ const Favorites = ({
                     <span className="icon icon-star"></span>
                 </div>
                 <div className="empty-state-text">
-                    <p>No favorites added</p>
-                    <span>Right-click an item and select <br /> "Add to Favorites"</span>
+                    <p>{t('No favorites added')}</p>
+                    <span>{t('Right-click an item and select')} <br /> {t('"Add to Favorites"')}</span>
                 </div>
             </div>
         );
@@ -116,7 +118,7 @@ const Favorites = ({
                     actions={[
                         {
                             icon: 'x',
-                            tooltip: 'Remove from favorites',
+                            tooltip: t('Remove from favorites'),
                             onClick: () => onRemove(item.path),
                         },
                     ]}

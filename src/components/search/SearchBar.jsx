@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useI18n } from '../../i18n';
 import './searchBar.css';
 
 /**
@@ -12,6 +13,7 @@ import './searchBar.css';
  * @returns {React.ReactElement} SearchBar component
  */
 const SearchBar = ({ value = '', onChange, onSubmit, placeholder = 'Search files and folders' }) => {
+    const { t } = useI18n();
     const [inputValue, setInputValue] = useState(value);
     const [isFocused, setIsFocused] = useState(false);
     const [isExpanded, setIsExpanded] = useState(true); // Always expanded
@@ -146,7 +148,7 @@ const SearchBar = ({ value = '', onChange, onSubmit, placeholder = 'Search files
             <button
                 className="search-icon"
                 onClick={handleSearchIconClick}
-                aria-label="Search"
+                aria-label={t('Search')}
             >
                 <span className="icon icon-search"></span>
             </button>
@@ -156,12 +158,12 @@ const SearchBar = ({ value = '', onChange, onSubmit, placeholder = 'Search files
                     ref={inputRef}
                     type="text"
                     className="search-input"
-                    placeholder={placeholder}
+                    placeholder={t(placeholder)}
                     value={inputValue}
                     onChange={handleChange}
                     onFocus={handleFocus}
                     onBlur={handleBlur}
-                    aria-label="Search input"
+                    aria-label={t('Search input')}
                 />
 
                 {inputValue && (
@@ -169,7 +171,7 @@ const SearchBar = ({ value = '', onChange, onSubmit, placeholder = 'Search files
                         type="button"
                         className="clear-button"
                         onClick={handleClear}
-                        aria-label="Clear search"
+                        aria-label={t('Clear search')}
                     >
                         <span className="icon icon-x"></span>
                     </button>

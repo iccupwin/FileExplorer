@@ -58,6 +58,7 @@ const ICON_MAP = {
     'bell': 'icon-bell',
     'menu': 'icon-menu',
     'grid': 'icon-grid',
+    'columns': 'icon-columns',
     'list': 'icon-list',
     'terminal': 'icon-terminal',
     'star': 'icon-star',

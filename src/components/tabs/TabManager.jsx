@@ -3,6 +3,7 @@ import { useHistory } from '../../providers/HistoryProvider';
 import { useFileSystem } from '../../providers/FileSystemProvider';
 import { useSftp } from '../../providers/SftpProvider';
 import IconButton from '../common/IconButton';
+import { useI18n } from '../../i18n';
 import './tabs.css';
 
 /**
@@ -14,6 +15,7 @@ import './tabs.css';
  */
 const TabManager = ({ children }) => {
     const [tabs, setTabs] = useState([]);
+    const { t } = useI18n();
     const [activeTabId, setActiveTabId] = useState(null);
     const { currentPath } = useHistory();
     const { loadDirectory } = useFileSystem();
@@ -93,7 +95,7 @@ const TabManager = ({ children }) => {
      * @returns {string} The full path for tooltip
      */
     const getFullPathForTooltip = (path) => {
-        if (!path) return 'Home';
+        if (!path) return t('Home');
         
         // Handle SFTP paths - convert to standard format
         if (isSftpPath(path)) {
@@ -121,8 +123,24 @@ const TabManager = ({ children }) => {
         };
 
         setTabs(prevTabs => [...prevTabs, newTab]);
-        switchToTab(newTab.id);
+        setActiveTabId(newTab.id);
     };
+
+    /**
+     * Cmd/Ctrl+T opens a new tab (like Finder)
+     */
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === 't' || e.key === 'T')) {
+                const target = e.target;
+                if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
+                e.preventDefault();
+                createNewTab();
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    });
 
     /**
      * Closes a tab and handles switching to another tab if needed
@@ -261,11 +279,11 @@ const TabManager = ({ children }) => {
     };
 
     if (tabs.length === 0) {
-        return <div className="tab-manager-loading">Loading...</div>;
+        return <div className="tab-manager-loading">{t('Loading...')}</div>;
     }
 
     return (
-        <div className="tab-manager">
+        <div className={`tab-manager ${tabs.length <= 1 ? 'single-tab' : ''}`}>
             <div className="tab-bar">
                 <div className="tab-list">
                     {tabs.map((tab, index) => (
@@ -301,7 +319,7 @@ const TabManager = ({ children }) => {
                                     <span className="icon icon-folder"></span>
                                 </span>
                                 <span className="tab-title" title={getFullPathForTooltip(tab.path)}>
-                                    {tab.title}
+                                    {tab.title === 'Home' || tab.title === 'Root' ? t(tab.title) : tab.title}
                                 </span>
                                 {tabs.length > 1 && (
                                     <button
@@ -310,7 +328,7 @@ const TabManager = ({ children }) => {
                                         onDoubleClick={handleDoubleClick}
                                         onMouseDown={handleMouseDown}
                                         onSelectStart={handleSelectStart}
-                                        aria-label="Close tab"
+                                        aria-label={t('Close tab')}
                                     >
                                         <span className="icon icon-x"></span>
                                     </button>

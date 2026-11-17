@@ -1,0 +1,848 @@
+/**
+ * Finder look for Explr (macOS).
+ * Loaded last (see main.jsx) so it overrides the component styles.
+ */
+
+/* ------------------------------------------------------------------ */
+/* Tokens                                                              */
+/* ------------------------------------------------------------------ */
+:root {
+    --light-background: #ffffff;
+    --light-background-secondary: #f5f5f7;
+    --light-background-tertiary: #ececee;
+    --light-surface: #ffffff;
+    --light-surface-hover: rgba(0, 0, 0, 0.05);
+    --light-surface-active: rgba(0, 0, 0, 0.09);
+    --light-border: #e2e2e4;
+    --light-text-primary: #1d1d1f;
+    --light-text-secondary: #6e6e73;
+    --light-text-tertiary: #8e8e93;
+
+    --dark-background: #1e1e1e;
+    --dark-background-secondary: #262628;
+    --dark-background-tertiary: #2f2f31;
+    --dark-surface: #1e1e1e;
+    --dark-surface-hover: rgba(255, 255, 255, 0.06);
+    --dark-surface-active: rgba(255, 255, 255, 0.1);
+    --dark-border: #3a3a3c;
+    --dark-text-primary: #ececec;
+    --dark-text-secondary: #a1a1a6;
+    --dark-text-tertiary: #8e8e93;
+
+    --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-size-xs: 11px;
+    --font-size-sm: 13px;
+    --font-size-md: 13px;
+    --font-size-lg: 15px;
+    --font-size-xl: 17px;
+    --font-size-xxl: 22px;
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+
+    --sidebar-width: 216px;
+    --toolbar-height: 52px;
+
+    --finder-sidebar-bg: #eeeef0;
+    --finder-sidebar-item-active: rgba(0, 0, 0, 0.085);
+    --finder-sidebar-icon: var(--accent);
+    --finder-hairline: rgba(0, 0, 0, 0.1);
+    --finder-hover: rgba(0, 0, 0, 0.05);
+    --finder-icon-selected: rgba(0, 0, 0, 0.08);
+    --finder-stripe: rgba(0, 0, 0, 0.028);
+    --finder-control-bg: rgba(0, 0, 0, 0.055);
+    --finder-control-active: #ffffff;
+    --finder-menu-bg: rgba(246, 246, 246, 0.92);
+}
+
+:root.theme-dark {
+    --finder-sidebar-bg: #2a2a2c;
+    --finder-sidebar-item-active: rgba(255, 255, 255, 0.1);
+    --finder-hairline: rgba(255, 255, 255, 0.1);
+    --finder-hover: rgba(255, 255, 255, 0.06);
+    --finder-icon-selected: rgba(255, 255, 255, 0.1);
+    --finder-stripe: rgba(255, 255, 255, 0.035);
+    --finder-control-bg: rgba(255, 255, 255, 0.08);
+    --finder-control-active: rgba(255, 255, 255, 0.2);
+    --finder-menu-bg: rgba(40, 40, 42, 0.92);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not(.theme-light):not(.theme-dark) {
+        --finder-sidebar-bg: #2a2a2c;
+        --finder-sidebar-item-active: rgba(255, 255, 255, 0.1);
+        --finder-hairline: rgba(255, 255, 255, 0.1);
+        --finder-hover: rgba(255, 255, 255, 0.06);
+        --finder-icon-selected: rgba(255, 255, 255, 0.1);
+        --finder-stripe: rgba(255, 255, 255, 0.035);
+        --finder-control-bg: rgba(255, 255, 255, 0.08);
+        --finder-control-active: rgba(255, 255, 255, 0.2);
+        --finder-menu-bg: rgba(40, 40, 42, 0.92);
+    }
+}
+
+html,
+body {
+    font-family: var(--font-family);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    background: var(--background);
+}
+
+button,
+input,
+select,
+textarea {
+    font-family: var(--font-family);
+}
+
+button:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* macOS-style thin scrollbars */
+::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: rgba(128, 128, 128, 0.45);
+    border-radius: 6px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(128, 128, 128, 0.7);
+}
+
+/* ------------------------------------------------------------------ */
+/* Window layout: full-height sidebar, toolbar in the title bar         */
+/* ------------------------------------------------------------------ */
+.main-layout .tab-manager {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: var(--toolbar-height) auto minmax(0, 1fr);
+    grid-template-areas:
+        "sidebar toolbar"
+        "sidebar tabs"
+        "sidebar content";
+    height: 100vh;
+    overflow: hidden;
+}
+
+.main-layout .tab-content-area,
+.main-layout .layout-content {
+    display: contents;
+}
+
+.main-layout .sidebar {
+    grid-area: sidebar;
+}
+
+.main-layout .toolbar {
+    grid-area: toolbar;
+}
+
+.main-layout .tab-bar {
+    grid-area: tabs;
+}
+
+.main-layout .content-area {
+    grid-area: content;
+    min-height: 0;
+    min-width: 0;
+    background: var(--background);
+}
+
+/* ------------------------------------------------------------------ */
+/* Toolbar                                                             */
+/* ------------------------------------------------------------------ */
+.main-layout .toolbar {
+    height: var(--toolbar-height);
+    padding: 0 12px 0 10px;
+    gap: 8px;
+    background: var(--background);
+    border-bottom: 1px solid var(--finder-hairline);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.main-layout .toolbar-left {
+    gap: 6px;
+}
+
+.main-layout .navigation-buttons {
+    display: flex;
+    gap: 2px;
+}
+
+.main-layout .nav-button,
+.main-layout .icon-button {
+    width: 30px;
+    height: 28px;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-secondary);
+    box-shadow: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.main-layout .nav-button:hover:not(:disabled),
+.main-layout .icon-button:hover:not(:disabled) {
+    background: var(--finder-hover);
+    color: var(--text-primary);
+}
+
+.main-layout .nav-button:disabled,
+.main-layout .icon-button:disabled {
+    opacity: 0.35;
+    background: transparent;
+}
+
+.main-layout .icon-button.active {
+    background: var(--finder-control-bg);
+    color: var(--text-primary);
+}
+
+/* Path: plain text segments like the Finder title / path bar */
+.main-layout .path-breadcrumb {
+    height: 28px;
+    padding: 0 8px;
+    background: transparent;
+    border-radius: var(--radius-md);
+    border: none;
+    box-shadow: none;
+}
+
+.main-layout .path-breadcrumb:hover {
+    background: var(--finder-hover);
+}
+
+.main-layout .path-breadcrumb.editing,
+.main-layout .path-breadcrumb.searching {
+    background: var(--finder-control-bg);
+}
+
+.main-layout .segment-button {
+    height: 22px;
+    margin: 0;
+    padding: 0 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 400;
+    border-radius: var(--radius-sm);
+    box-shadow: none;
+}
+
+.main-layout .segment-button:hover {
+    background: var(--finder-hover);
+    color: var(--text-primary);
+}
+
+.main-layout .segment-button.current {
+    background: transparent;
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.main-layout .segment-divider {
+    margin: 0 1px;
+    color: var(--text-tertiary);
+    opacity: 0.8;
+}
+
+.main-layout .path-input,
+.main-layout .path-search-input {
+    font-size: 13px;
+    color: var(--text-primary);
+    background: transparent;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tabs (only shown with more than one tab, like Finder)               */
+/* ------------------------------------------------------------------ */
+.main-layout .tab-manager.single-tab .tab-bar {
+    display: none;
+}
+
+.main-layout .tab-bar {
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    background: var(--background-tertiary);
+    border-bottom: 1px solid var(--finder-hairline);
+}
+
+.main-layout .tab-list {
+    height: 100%;
+    gap: 0;
+}
+
+.main-layout .tab {
+    flex: 1 1 0;
+    max-width: none;
+    min-width: 120px;
+    height: 100%;
+    margin: 0;
+    padding: 0 28px;
+    justify-content: center;
+    border: none;
+    border-right: 1px solid var(--finder-hairline);
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    box-shadow: none;
+}
+
+.main-layout .tab::before,
+.main-layout .tab::after {
+    display: none;
+}
+
+.main-layout .tab:hover {
+    background: var(--finder-hover);
+}
+
+.main-layout .tab.active {
+    background: var(--background);
+    color: var(--text-primary);
+}
+
+.main-layout .tab-icon {
+    display: none;
+}
+
+.main-layout .tab-close {
+    position: absolute;
+    left: 6px;
+    opacity: 0;
+}
+
+.main-layout .tab:hover .tab-close {
+    opacity: 1;
+}
+
+.main-layout .new-tab-button {
+    padding: 0 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sidebar                                                             */
+/* ------------------------------------------------------------------ */
+.main-layout .sidebar {
+    background: var(--finder-sidebar-bg);
+    border-right: 1px solid var(--finder-hairline);
+    height: 100vh;
+}
+
+.sidebar-titlebar {
+    height: var(--toolbar-height);
+    flex: 0 0 var(--toolbar-height);
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.main-layout .sidebar-content {
+    padding: 0 0 8px;
+}
+
+.main-layout .sidebar-section {
+    margin: 0 0 10px;
+    padding: 0;
+    border: none;
+}
+
+.main-layout .sidebar-section-header {
+    padding: 4px 10px 2px 18px;
+    min-height: 22px;
+    border: none;
+    background: transparent;
+}
+
+.main-layout .sidebar-section-title {
+    padding: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-tertiary);
+}
+
+.main-layout .sidebar-section-actions {
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.main-layout .sidebar-section:hover .sidebar-section-actions {
+    opacity: 1;
+}
+
+.main-layout .section-collapse-button {
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.main-layout .sidebar-section-header:hover .section-collapse-button,
+.main-layout .sidebar-section:hover .section-collapse-button {
+    opacity: 1;
+}
+
+.main-layout .section-collapse-button,
+.main-layout .section-add-button {
+    width: 20px;
+    height: 20px;
+    color: var(--text-tertiary);
+    background: transparent;
+}
+
+.main-layout .sidebar-list {
+    padding: 0 10px;
+    gap: 1px;
+}
+
+.main-layout .sidebar-item {
+    min-height: 28px;
+    height: auto;
+    margin: 0;
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.main-layout .sidebar-item::before,
+.main-layout .sidebar-item.active::before {
+    display: none;
+}
+
+.main-layout .sidebar-item:hover {
+    background: transparent;
+}
+
+.main-layout .sidebar-item.active {
+    background: var(--finder-sidebar-item-active);
+    color: var(--text-primary);
+}
+
+.main-layout .sidebar-item-icon,
+.main-layout .sidebar-item.active .sidebar-item-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    color: var(--finder-sidebar-icon);
+}
+
+.main-layout .sidebar-item-name {
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.main-layout .sidebar-item-info {
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.main-layout .sidebar-footer {
+    padding: 6px 10px 10px;
+    border-top: 1px solid var(--finder-hairline);
+    background: transparent;
+}
+
+.main-layout .sidebar-action-button {
+    height: 28px;
+    padding: 0 8px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    color: var(--text-primary);
+    background: transparent;
+}
+
+.main-layout .sidebar-action-button:hover,
+.main-layout .sidebar-action-button.active {
+    background: var(--finder-sidebar-item-active);
+}
+
+.main-layout .sidebar-action-button .icon {
+    color: var(--finder-sidebar-icon);
+}
+
+.main-layout .sidebar-empty-state {
+    padding: 6px 18px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    text-align: left;
+    align-items: flex-start;
+}
+
+.main-layout .sidebar-empty-state .empty-state-icon {
+    display: none;
+}
+
+.main-layout .sidebar-empty-state .empty-state-text {
+    margin-top: 0;
+}
+
+.main-layout .sidebar-empty-state p {
+    margin: 0;
+    font-size: 11px;
+    line-height: 15px;
+    color: var(--text-tertiary);
+}
+
+/* ------------------------------------------------------------------ */
+/* Action bar under the toolbar                                        */
+/* ------------------------------------------------------------------ */
+.main-layout .action-bar {
+    min-height: 40px;
+    padding: 4px 12px;
+    gap: 8px;
+    background: var(--background);
+    border-bottom: 1px solid var(--finder-hairline);
+}
+
+.main-layout .action-bar-left,
+.main-layout .action-bar-right {
+    gap: 2px;
+}
+
+.main-layout .action-divider {
+    width: 1px;
+    height: 18px;
+    margin: 0 6px;
+    background: var(--finder-hairline);
+}
+
+.main-layout .create-button {
+    height: 28px;
+    padding: 0 10px;
+    gap: 6px;
+    border-radius: var(--radius-md);
+    background: var(--finder-control-bg);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: none;
+}
+
+.main-layout .create-button:hover {
+    background: var(--surface-active);
+}
+
+/* Segmented control for icon / list / columns */
+.main-layout .view-modes {
+    padding: 2px;
+    gap: 0;
+    border-radius: 7px;
+    background: var(--finder-control-bg);
+    border: none;
+}
+
+.main-layout .view-mode-button {
+    width: 30px;
+    height: 24px;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    box-shadow: none;
+}
+
+.main-layout .view-mode-button.active {
+    background: var(--finder-control-active);
+    color: var(--text-primary);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+}
+
+/* ------------------------------------------------------------------ */
+/* File list                                                           */
+/* ------------------------------------------------------------------ */
+.main-layout .file-list-container {
+    background: var(--background);
+}
+
+.main-layout .file-list.view-mode-grid {
+    grid-template-columns: repeat(auto-fill, minmax(calc(var(--icon-size, 64px) + 36px), 1fr));
+    gap: 6px 4px;
+    padding: 14px 16px 24px;
+}
+
+.main-layout .file-item {
+    border-radius: var(--radius-md);
+    transition: none;
+}
+
+.main-layout .file-item:hover,
+.main-layout .file-item.focused,
+.main-layout .file-item.selected,
+.main-layout .file-item.focused.selected {
+    background: transparent;
+}
+
+/* Icon view: gray rounded square behind the icon, blue pill behind the name */
+.main-layout .file-item.view-mode-grid {
+    padding: 4px 2px 6px;
+    min-width: 0;
+}
+
+.main-layout .file-item.view-mode-grid .file-icon-container {
+    width: calc(var(--icon-size, 64px) + 8px);
+    height: calc(var(--icon-size, 64px) + 8px);
+    padding: 4px;
+    margin-bottom: 4px;
+    border-radius: 7px;
+    box-sizing: border-box;
+}
+
+.main-layout .file-item.view-mode-grid.selected .file-icon-container {
+    background: var(--finder-icon-selected);
+}
+
+.main-layout .file-item.view-mode-grid .file-name,
+.main-layout .file-item.view-mode-grid .file-name.truncate {
+    max-width: 100%;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 15px;
+    color: var(--text-primary);
+    white-space: normal;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.main-layout .file-item.view-mode-grid.selected .file-name {
+    background: var(--accent);
+    color: #ffffff;
+}
+
+/* System (Finder) icons */
+.file-icon.file-icon-system {
+    color: inherit;
+}
+
+.file-icon.file-icon-system img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    -webkit-user-drag: none;
+    pointer-events: none;
+}
+
+/* Thumbnails like Finder: thin frame, soft shadow */
+.main-layout .file-thumbnail {
+    border-radius: 3px;
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.18);
+    background: transparent;
+}
+
+/* List and details views: compact rows, zebra stripes, blue selection */
+.main-layout .file-list.view-mode-list,
+.main-layout .file-list.view-mode-details {
+    gap: 0;
+    padding: 4px 8px 16px;
+}
+
+.main-layout .file-item.view-mode-list,
+.main-layout .file-item.view-mode-details {
+    min-height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 5px;
+}
+
+.main-layout .file-item.view-mode-list:nth-child(even),
+.main-layout .file-item.view-mode-details:nth-child(even) {
+    background: var(--finder-stripe);
+}
+
+.main-layout .file-item.view-mode-list .file-item-list,
+.main-layout .file-item.view-mode-details .file-item-details {
+    min-height: 24px;
+    padding: 2px 8px;
+}
+
+.main-layout .file-item.view-mode-list .file-icon-container,
+.main-layout .file-item.view-mode-details .file-icon-container {
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+}
+
+.main-layout .file-item.view-mode-details .file-column {
+    padding: 0 6px;
+    font-size: 13px;
+}
+
+.main-layout .file-item.view-mode-list.selected,
+.main-layout .file-item.view-mode-details.selected,
+.main-layout .file-item.view-mode-list.selected:nth-child(even),
+.main-layout .file-item.view-mode-details.selected:nth-child(even) {
+    background: var(--accent);
+}
+
+.main-layout .file-item.view-mode-list.selected *,
+.main-layout .file-item.view-mode-details.selected * {
+    color: #ffffff !important;
+}
+
+.main-layout .file-list-header {
+    padding: 4px 16px;
+    min-height: 26px;
+    background: var(--background);
+    border-bottom: 1px solid var(--finder-hairline);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.main-layout .file-list-column {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* ------------------------------------------------------------------ */
+/* Context menu: macOS menu look                                       */
+/* ------------------------------------------------------------------ */
+.context-menu {
+    padding: 5px;
+    border-radius: 9px;
+    background: var(--finder-menu-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border: 0.5px solid var(--finder-hairline);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+    font-size: 13px;
+    min-width: 220px;
+}
+
+.context-menu-item {
+    height: 24px;
+    min-height: 24px;
+    padding: 0 10px;
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.context-menu-item:hover:not(.disabled),
+.context-menu-item.active {
+    background: var(--accent);
+    color: #ffffff;
+}
+
+.context-menu-item:hover:not(.disabled) .context-menu-icon,
+.context-menu-item:hover:not(.disabled) .context-menu-shortcut,
+.context-menu-item:hover:not(.disabled) .context-menu-label {
+    color: #ffffff;
+}
+
+.context-menu-separator {
+    margin: 5px 10px;
+    height: 1px;
+    background: var(--finder-hairline);
+}
+
+.context-menu-shortcut {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+/* ------------------------------------------------------------------ */
+/* Drag and drop targets                                               */
+/* ------------------------------------------------------------------ */
+.main-layout .file-item.directory.drop-target .file-icon-container {
+    background: var(--finder-icon-selected);
+    box-shadow: 0 0 0 2px var(--accent) inset;
+}
+
+.main-layout .file-item.view-mode-list.drop-target,
+.main-layout .file-item.view-mode-details.drop-target {
+    background: var(--accent) !important;
+}
+
+.main-layout .file-item.view-mode-list.drop-target *,
+.main-layout .file-item.view-mode-details.drop-target * {
+    color: #fff !important;
+}
+
+.main-layout .sidebar-item.drop-target {
+    background: var(--accent);
+    color: #fff;
+}
+
+.main-layout .sidebar-item.drop-target .sidebar-item-icon {
+    color: #fff;
+}
+
+.main-layout .file-list-container.drop-target {
+    box-shadow: inset 0 0 0 3px var(--accent);
+    border-radius: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Title bar dragging: the path only takes the width it needs, so the  */
+/* empty toolbar space can be used to move the window (like Finder).   */
+/* ------------------------------------------------------------------ */
+.main-layout .toolbar .path-breadcrumb-container {
+    flex: 0 1 auto;
+    max-width: 65%;
+}
+
+.main-layout .toolbar .path-breadcrumb {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.main-layout .toolbar .path-breadcrumb-container:has(.editing),
+.main-layout .toolbar .path-breadcrumb-container:has(.searching) {
+    flex: 1 1 auto;
+    max-width: none;
+}
+
+.main-layout .toolbar .path-breadcrumb.editing,
+.main-layout .toolbar .path-breadcrumb.searching {
+    flex: 1 1 auto;
+}
+
+/* Rubber-band selection rectangle */
+.main-layout .file-list-container .marquee-rect {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    border: 1px solid var(--accent);
+    background: rgba(var(--accent-rgb, 6, 114, 239), 0.15);
+    border-radius: 2px;
+}
+
+
+/* Performance: skip layout/paint of tiles that are off screen (big folders scroll smoothly) */
+.main-layout .file-list.view-mode-grid > .file-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto calc(var(--icon-size, 64px) + 52px);
+}
+
+.main-layout .file-list.view-mode-list > .file-item,
+.main-layout .file-list.view-mode-details > .file-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 24px;
+}

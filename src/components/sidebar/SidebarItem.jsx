@@ -75,6 +75,7 @@ const SidebarItem = ({
     return (
         <li
             className={`sidebar-item ${isActive ? 'active' : ''}`}
+            data-drop-path={path}
             onClick={onClick}
             onDoubleClick={handleDoubleClick}
             onMouseDown={handleMouseDown}

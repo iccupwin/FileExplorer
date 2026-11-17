@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import SidebarItem from './SidebarItem';
+import { useI18n } from '../../i18n';
 
 /**
  * QuickAccess component - Displays recent locations for quick navigation
@@ -12,6 +13,7 @@ import SidebarItem from './SidebarItem';
  * @returns {React.ReactElement} QuickAccess component
  */
 const QuickAccess = ({ isCollapsed = false, onItemClick, currentView, currentPath }) => {
+    const { t } = useI18n();
     const [recentItems, setRecentItems] = useState([]);
 
     /**
@@ -92,7 +94,7 @@ const QuickAccess = ({ isCollapsed = false, onItemClick, currentView, currentPat
 
         return (
             <div className="sidebar-empty-state">
-                <p>No recent locations</p>
+                <p>{t('No recent locations')}</p>
             </div>
         );
     }

@@ -3,6 +3,7 @@ import FileList from '../explorer/FileList';
 import EmptyState from '../explorer/EmptyState';
 import useSearch from '../../hooks/useSearch';
 import { formatFileSize, formatDate } from '../../utils/formatters';
+import { useI18n } from '../../i18n';
 import './searchResults.css';
 
 /**
@@ -15,6 +16,7 @@ import './searchResults.css';
  * @returns {React.ReactElement} SearchResults component
  */
 const SearchResults = ({ query, viewMode, onClearSearch }) => {
+    const { t, plural } = useI18n();
     const {
         results,
         isSearching,
@@ -40,13 +42,13 @@ const SearchResults = ({ query, viewMode, onClearSearch }) => {
             <div className="search-results-container">
                 <div className="search-header">
                     <h2 className="search-title">
-                        Searching for "{query}"
+                        {t('Searching for "{query}"', { query })}
                     </h2>
                     <div className="search-progress">
                         <div className="progress progress-indeterminate">
                             <div className="progress-bar"></div>
                         </div>
-                        <p className="search-info">Searching in {options.searchIn || 'current location'}...</p>
+                        <p className="search-info">{t('Searching in {location}…', { location: options.searchIn || t('current location') })}</p>
                     </div>
                 </div>
 
@@ -63,13 +65,13 @@ const SearchResults = ({ query, viewMode, onClearSearch }) => {
             <div className="search-results-container">
                 <div className="search-header">
                     <h2 className="search-title">
-                        Search error
+                        {t('Search error')}
                     </h2>
                     <button
                         className="btn btn-ghost btn-sm"
                         onClick={onClearSearch}
                     >
-                        Clear search
+                        {t('Clear search')}
                     </button>
                 </div>
 
@@ -78,8 +80,8 @@ const SearchResults = ({ query, viewMode, onClearSearch }) => {
                         <span className="icon icon-alert-circle"></span>
                     </div>
                     <div className="alert-content">
-                        <div className="alert-title">Search failed</div>
-                        <p className="alert-message">{error}</p>
+                        <div className="alert-title">{t('Search failed')}</div>
+                        <p className="alert-message">{t(error)}</p>
                     </div>
                 </div>
             </div>
@@ -97,13 +99,13 @@ const SearchResults = ({ query, viewMode, onClearSearch }) => {
             <div className="search-results-container">
                 <div className="search-header">
                     <h2 className="search-title">
-                        Search results for "{query}"
+                        {t('Search results for "{query}"', { query })}
                     </h2>
                     <button
                         className="btn btn-ghost btn-sm"
                         onClick={onClearSearch}
                     >
-                        Clear search
+                        {t('Clear search')}
                     </button>
                 </div>
 
@@ -122,17 +124,17 @@ const SearchResults = ({ query, viewMode, onClearSearch }) => {
         <div className="search-results-container">
             <div className="search-header">
                 <h2 className="search-title">
-                    Search results for "{query}"
+                    {t('Search results for "{query}"', { query })}
                 </h2>
                 <div className="search-controls">
                   <span className="search-count">
-                    {totalResults} {totalResults === 1 ? 'result' : 'results'} found
+                    {plural(totalResults, { en: ['{count} result found', '{count} results found'], ru: ['Найден {count} результат', 'Найдено {count} результата', 'Найдено {count} результатов'] })}
                   </span>
                     <button
                         className="btn btn-ghost btn-sm"
                         onClick={onClearSearch}
                     >
-                        Clear search
+                        {t('Clear search')}
                     </button>
                 </div>
             </div>
@@ -140,14 +142,14 @@ const SearchResults = ({ query, viewMode, onClearSearch }) => {
             {/* Search filter tags (optional) */}
             <div className="search-filters">
                 {options.caseSensitive && (
-                    <span className="search-filter">Case sensitive</span>
+                    <span className="search-filter">{t('Case sensitive')}</span>
                 )}
                 {options.matchWholeWord && (
-                    <span className="search-filter">Whole word</span>
+                    <span className="search-filter">{t('Whole word')}</span>
                 )}
                 {options.fileTypes.length > 0 && (
                     <span className="search-filter">
-                      Type: {options.fileTypes.join(', ')}
+                      {t('Type: {types}', { types: options.fileTypes.join(', ') })}
                     </span>
                 )}
             </div>

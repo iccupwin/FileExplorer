@@ -7,9 +7,13 @@ import EmptyState from '../explorer/EmptyState';
 import FileIcon from '../explorer/FileIcon';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
+import { useI18n } from '../../i18n';
 import './search.css';
 
+const IS_MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || navigator.userAgent);
+
 const GlobalSearch = ({ isOpen, onClose }) => {
+    const { t, plural, locale } = useI18n();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -358,18 +362,18 @@ const GlobalSearch = ({ isOpen, onClose }) => {
 
     // Format time remaining
     const formatTimeRemaining = (ms) => {
-        if (!ms) return 'Calculating...';
+        if (!ms) return t('Calculating…');
 
         const seconds = Math.floor(ms / 1000);
         const minutes = Math.floor(seconds / 60);
         const hours = Math.floor(minutes / 60);
 
         if (hours > 0) {
-            return `${hours}h ${minutes % 60}m`;
+            return t('{h}h {m}m', { h: hours, m: minutes % 60 });
         } else if (minutes > 0) {
-            return `${minutes}m ${seconds % 60}s`;
+            return t('{m}m {s}s', { m: minutes, s: seconds % 60 });
         } else {
-            return `${seconds}s`;
+            return t('{s}s', { s: seconds });
         }
     };
 
@@ -543,16 +547,19 @@ const GlobalSearch = ({ isOpen, onClose }) => {
             const searchStartTime = performance.now();
             let searchResults;
 
-            // Use extension filtering if extensions are selected
-            if (selectedExtensions.length > 0) {
-                console.log(`Searching with extensions: ${selectedExtensions.join(', ')}`);
+            if (IS_MAC) {
+                // macOS: query the system Spotlight index (instant, nothing to crawl)
+                searchResults = await invoke('spotlight_search', {
+                    query: query.trim(),
+                    extensions: selectedExtensions.length > 0 ? selectedExtensions : null,
+                    limit: 300
+                });
+            } else if (selectedExtensions.length > 0) {
                 searchResults = await invoke('search_with_extension', {
                     query: query.trim(),
                     extensions: selectedExtensions
                 });
             } else {
-                // Use basic search
-                console.log(`Performing basic search for: "${query.trim()}"`);
                 searchResults = await invoke('search', {
                     query: query.trim()
                 });
@@ -755,7 +762,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
             onClose();
         } catch (error) {
             console.error('Failed to open item location:', error);
-            alert(`Failed to open location: ${error.message || error}`);
+            alert(t('Failed to open location: {error}', { error: error.message || error }));
         }
     };
 
@@ -789,7 +796,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
             onClose();
         } catch (error) {
             console.error('Failed to navigate to path:', error);
-            alert(`Failed to navigate: ${error.message || error}`);
+            alert(t('Failed to navigate: {error}', { error: error.message || error }));
         }
     };
 
@@ -843,14 +850,14 @@ const GlobalSearch = ({ isOpen, onClose }) => {
             stopProgressPolling();
 
             // Show error to user
-            alert(`Failed to start indexing: ${error.message || error}`);
+            alert(t('Failed to start indexing: {error}', { error: error.message || error }));
         }
     };
 
     // Manual indexing trigger
     const startManualIndexing = async () => {
         if (!systemInfo?.user_home_dir) {
-            alert('User home directory not available for indexing');
+            alert(t('User home directory not available for indexing'));
             return;
         }
 
@@ -893,7 +900,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
 
         } catch (error) {
             console.error('Manual indexing failed:', error);
-            alert(`Failed to start indexing: ${error.message || error}`);
+            alert(t('Failed to start indexing: {error}', { error: error.message || error }));
             setIsIndexing(false);
             stopProgressPolling();
         }
@@ -901,7 +908,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
 
     // Clear search engine index
     const clearSearchEngine = async () => {
-        if (!window.confirm('Are you sure you want to clear the entire search index? This will remove all indexed files and you will need to re-index.')) {
+        if (!window.confirm(t('Are you sure you want to clear the entire search index? This will remove all indexed files and you will need to re-index.'))) {
             return;
         }
 
@@ -915,10 +922,10 @@ const GlobalSearch = ({ isOpen, onClose }) => {
             setQuery('');
             await loadSearchEngineInfo();
             
-            alert('Search engine index cleared successfully. You can now re-index your files.');
+            alert(t('Search engine index cleared successfully. You can now re-index your files.'));
         } catch (error) {
             console.error('Failed to clear search engine:', error);
-            alert(`Failed to clear search engine: ${error.message || error}`);
+            alert(t('Failed to clear search engine: {error}', { error: error.message || error }));
         }
     };
 
@@ -942,7 +949,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title="Global Search"
+            title={t('Global Search')}
             size="lg"
         >
             <div className="global-search-content">
@@ -979,7 +986,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                     // Delay hiding suggestions to allow clicking on them
                                     setTimeout(() => setIsInputFocused(false), 150);
                                 }}
-                                placeholder="Search files and folders....."
+                                placeholder={t('Search files and folders…')}
                                 autoFocus
                                 style={{
                                     paddingRight: query.trim() ? '110px' : '75px' // Extra space for both search and filter buttons
@@ -996,7 +1003,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                     pointerEvents: 'none', // Prevent interference with input
                                     zIndex: 1
                                 }}>
-                                    Searching...
+                                    {t('Searching…')}
                                 </div>
                             )}
                             {query.trim() && (
@@ -1004,7 +1011,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                     type="button"
                                     className="clear-search-btn"
                                     onClick={clearSearch}
-                                    title="Clear search"
+                                    title={t('Clear search')}
                                     style={{
                                         position: 'absolute',
                                         right: '75px',
@@ -1048,7 +1055,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                             <button
                                 type="submit"
                                 className="search-btn"
-                                title="Search (Enter)"
+                                title={t('Search (Enter)')}
                                 onClick={() => {
                                     // Hide suggestions immediately when search button is clicked
                                     setShowSuggestions(false);
@@ -1100,7 +1107,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                     console.log('Filter button clicked, current state:', filtersExpanded);
                                     setFiltersExpanded(!filtersExpanded);
                                 }}
-                                title="Search filters and options"
+                                title={t('Search filters and options')}
                                 style={{
                                     position: 'absolute',
                                     right: '8px',
@@ -1181,9 +1188,9 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                 borderBottom: '1px solid var(--border)',
                                 fontWeight: '500'
                             }}>
-                                Suggestions
+                                {t('Suggestions')}
                                 {isLoadingSuggestions && (
-                                    <span style={{ marginLeft: '8px', fontStyle: 'italic' }}>Loading...</span>
+                                    <span style={{ marginLeft: '8px', fontStyle: 'italic' }}>{t('Loading...')}</span>
                                 )}
                             </div>
                             {suggestions.map((suggestion, index) => (
@@ -1208,7 +1215,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                         color: 'var(--text-secondary)', 
                                         marginLeft: '8px' 
                                     }}>
-                                        Press Tab or click to use
+                                        {t('Press Tab or click to use')}
                                     </span>
                                 </div>
                             ))}
@@ -1236,20 +1243,20 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                             {/* Current Directory Context */}
                             {currentDirectory && (
                                 <div className="search-control-section">
-                                    <h4 style={{ margin: '0 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>Current Context</h4>
+                                    <h4 style={{ margin: '0 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>{t('Current Context')}</h4>
                                     <div className="current-directory-info">
-                                        <span className="directory-label">Current Directory:</span>
+                                        <span className="directory-label">{t('Current Directory:')}</span>
                                         <span className="directory-path" title={currentDirectory}>
                                             {currentDirectory}
                                         </span>
-                                        <small>(Files in this directory will be ranked higher)</small>
+                                        <small>{t('(Files in this directory will be ranked higher)')}</small>
                                     </div>
                                 </div>
                             )}
 
                             {/* Sort Controls */}
                             <div className="search-control-section">
-                                <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>Sort Results By</h4>
+                                <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>{t('Sort Results By')}</h4>
                                 <div className="sort-controls">
                                     {[
                                         { value: 'relevance', label: 'Relevance (Score)' },
@@ -1266,7 +1273,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                                 onChange={(e) => setSortBy(e.target.value)}
                                                 disabled={isSearching}
                                             />
-                                            <span>{option.label}</span>
+                                            <span>{t(option.label)}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -1274,7 +1281,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
 
                             {/* Filter Controls */}
                             <div className="search-control-section">
-                                <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>Filter Options</h4>
+                                <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>{t('Filter Options')}</h4>
                                 <div className="filter-controls">
                                     <label className="checkbox-option">
                                         <input
@@ -1283,7 +1290,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                             onChange={(e) => setShowDirectoriesOnly(e.target.checked)}
                                             disabled={isSearching}
                                         />
-                                        <span>Show directories only</span>
+                                        <span>{t('Show directories only')}</span>
                                     </label>
                                     <label className="checkbox-option">
                                         <input
@@ -1292,14 +1299,14 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                             onChange={(e) => setShowHiddenFiles(e.target.checked)}
                                             disabled={isSearching}
                                         />
-                                        <span>Show hidden files</span>
+                                        <span>{t('Show hidden files')}</span>
                                     </label>
                                 </div>
                             </div>
 
                             {/* Extension Filters */}
                             <div className="search-control-section">
-                                <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>File Type Filters</h4>
+                                <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>{t('File Type Filters')}</h4>
                                 <div className="extension-filters">
                                     <div className="extension-checkboxes">
                                         {commonExtensions.map(ext => (
@@ -1310,20 +1317,20 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                                     onChange={() => handleExtensionChange(ext.value)}
                                                     disabled={isSearching}
                                                 />
-                                                <span>{ext.label}</span>
+                                                <span>{t(ext.label)}</span>
                                             </label>
                                         ))}
                                     </div>
                                     {selectedExtensions.length > 0 && (
                                         <div className="selected-extensions">
-                                            Selected: {selectedExtensions.join(', ')}
+                                            {t('Selected: {list}', { list: selectedExtensions.join(', ') })}
                                             <button
                                                 type="button"
                                                 onClick={() => setSelectedExtensions([])}
                                                 className="clear-extensions"
                                                 disabled={isSearching}
                                             >
-                                                Clear
+                                                {t('Clear')}
                                             </button>
                                         </div>
                                     )}
@@ -1333,7 +1340,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                             {/* Recent Searches */}
                             {recentSearches.length > 0 && (
                                 <div className="search-control-section">
-                                    <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>Recent Searches</h4>
+                                    <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>{t('Recent Searches')}</h4>
                                     <div className="recent-searches">
                                         {recentSearches.slice(0, 5).map((recentQuery, index) => (
                                             <button
@@ -1344,7 +1351,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                                     setFiltersExpanded(false);
                                                 }}
                                                 disabled={isSearching}
-                                                title={`Search for: ${recentQuery}`}
+                                                title={t('Search for: {query}', { query: recentQuery })}
                                             >
                                                 "{recentQuery}"
                                             </button>
@@ -1356,7 +1363,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                             {/* Most Accessed Paths */}
                             {mostAccessedPaths.length > 0 && (
                                 <div className="search-control-section">
-                                    <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>Most Accessed Paths</h4>
+                                    <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>{t('Most Accessed Paths')}</h4>
                                     <div className="most-accessed-paths">
                                         {mostAccessedPaths.slice(0, 5).map((path, index) => (
                                             <button
@@ -1366,7 +1373,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                                     navigateToAccessedPath(path);
                                                     setFiltersExpanded(false);
                                                 }}
-                                                title={`Navigate to: ${path}`}
+                                                title={t('Go to: {path}', { path })}
                                             >
                                                 <span className="path-name">
                                                     {path.split('/').pop() || path}
@@ -1383,43 +1390,43 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                             {/* Engine Statistics & Performance */}
                             {searchEngineInfo && (
                                 <div className="search-control-section">
-                                    <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>Engine Statistics & Performance</h4>
+                                    <h4 style={{ margin: 'var(--space-md) 0 var(--space-sm) 0', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>{t('Engine Statistics & Performance')}</h4>
                                     <div className="search-engine-info-compact">
                                         <div className="info-grid">
                                             <div className="info-item">
-                                                <span className="info-label">Engine Status:</span>
-                                                <span className="info-value">{searchEngineInfo.status || 'Unknown'}</span>
+                                                <span className="info-label">{t('Engine Status:')}</span>
+                                                <span className="info-value">{t(String(searchEngineInfo.status || 'Unknown').replace(/"/g, ''))}</span>
                                             </div>
                                             <div className="info-item">
-                                                <span className="info-label">Indexed Files:</span>
+                                                <span className="info-label">{t('Indexed Files:')}</span>
                                                 <span className="info-value">{searchEngineInfo.stats?.trie_size || 0}</span>
                                             </div>
                                             <div className="info-item">
-                                                <span className="info-label">Cache Size:</span>
+                                                <span className="info-label">{t('Cache Size:')}</span>
                                                 <span className="info-value">{searchEngineInfo.stats?.cache_size || 0}</span>
                                             </div>
                                             <div className="info-item">
-                                                <span className="info-label">Total Searches:</span>
+                                                <span className="info-label">{t('Total Searches:')}</span>
                                                 <span className="info-value">{searchMetrics.total_searches || 0}</span>
                                             </div>
                                             <div className="info-item">
-                                                <span className="info-label">Avg Search Time:</span>
-                                                <span className="info-value">{searchMetrics.average_search_time_ms || 0}ms</span>
+                                                <span className="info-label">{t('Avg Search Time:')}</span>
+                                                <span className="info-value">{t('{value} ms', { value: searchMetrics.average_search_time_ms || 0 })}</span>
                                             </div>
                                             <div className="info-item">
-                                                <span className="info-label">Cache Hit Rate:</span>
+                                                <span className="info-label">{t('Cache Hit Rate:')}</span>
                                                 <span className="info-value">
                                                     {searchMetrics.cache_hit_rate ? 
                                                         `${(searchMetrics.cache_hit_rate * 100).toFixed(1)}%` : 
-                                                        'N/A'
+                                                        t('N/A')
                                                     }
                                                 </span>
                                             </div>
                                             {searchEngineInfo.last_updated && (
                                                 <div className="info-item">
-                                                    <span className="info-label">Last Updated:</span>
+                                                    <span className="info-label">{t('Last Updated:')}</span>
                                                     <span className="info-value">
-                                                        {new Date(searchEngineInfo.last_updated).toLocaleString()}
+                                                        {new Date(searchEngineInfo.last_updated).toLocaleString(locale)}
                                                     </span>
                                                 </div>
                                             )}
@@ -1436,7 +1443,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                                 }}
                                                 disabled={isSearching || isIndexing || !systemInfo?.user_home_dir}
                                             >
-                                                {isIndexing ? 'Indexing...' : 'Re-index Home Directory'}
+                                                {isIndexing ? t('Indexing…') : t('Re-index Home Directory')}
                                             </Button>
                                             
                                             {/* Test indexing with a smaller directory */}
@@ -1445,7 +1452,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                                 size="sm"
                                                 onClick={async () => {
                                                     if (!systemInfo?.user_home_dir) {
-                                                        alert('System info not available');
+                                                        alert(t('System info not available'));
                                                         return;
                                                     }
 
@@ -1476,7 +1483,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                                         console.log('Test indexing result:', result);
                                                     } catch (error) {
                                                         console.error('Test indexing failed:', error);
-                                                        alert(`Test indexing failed: ${error.message || error}`);
+                                                        alert(t('Test indexing failed: {error}', { error: error.message || error }));
                                                         setIsIndexing(false);
                                                         stopProgressPolling();
                                                     }
@@ -1486,7 +1493,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                                 disabled={isSearching || isIndexing || !systemInfo?.user_home_dir}
                                                 style={{ marginLeft: '8px' }}
                                             >
-                                                Test Index (Documents)
+                                                {t('Test Index (Documents)')}
                                             </Button>
                                         </div>
                                     </div>
@@ -1505,7 +1512,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                             backgroundColor: '#f0f0f0',
                             borderRadius: '4px'
                         }}>
-                            Type at least 3 characters to start searching...
+                            {t('Type at least 3 characters to start searching…')}
                         </div>
                     )}
 
@@ -1514,8 +1521,8 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                         <div className="indexing-progress">
                             {isLoadingStatus && !isIndexing && (
                                 <div className="progress-header">
-                                    <h3>Checking Indexing Status...</h3>
-                                    <span className="progress-percentage">Please wait...</span>
+                                    <h3>{t('Checking Indexing Status…')}</h3>
+                                    <span className="progress-percentage">{t('Please wait…')}</span>
                                 </div>
                             )}
                             
@@ -1524,16 +1531,16 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                     <div className="progress-header">
                                         <h3>
                                             {indexingProgress.files_discovered === 0 ? 
-                                                'Starting Discovery...' : 
-                                                indexingProgress.files_indexed === 0 ? 'Discovering Files...' :
-                                                indexingProgress.files_indexed < indexingProgress.files_discovered ? 'Indexing Files...' :
-                                                'Finalizing...'
+                                                t('Starting Discovery…') : 
+                                                indexingProgress.files_indexed === 0 ? t('Discovering Files…') :
+                                                indexingProgress.files_indexed < indexingProgress.files_discovered ? t('Indexing Files…') :
+                                                t('Finalizing…')
                                             }
                                         </h3>
                                         <span className="progress-percentage">
                                             {indexingProgress.files_discovered === 0 ? 
-                                                'Starting...' : 
-                                                indexingProgress.files_indexed === 0 ? `${indexingProgress.files_discovered} found` :
+                                                t('Starting…') : 
+                                                indexingProgress.files_indexed === 0 ? t('{count} found', { count: indexingProgress.files_discovered }) :
                                                 `${indexingProgress.percentage_complete.toFixed(1)}%`
                                             }
                                         </span>
@@ -1554,13 +1561,13 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                     <div className="progress-details">
                                         <div className="progress-stats">
                                             <span>
-                                                {indexingProgress.files_indexed} indexed / {indexingProgress.files_discovered} discovered
-                                                {indexingProgress.files_discovered === 0 && ' (starting...)'}
-                                                {indexingProgress.files_discovered > 0 && indexingProgress.files_indexed === 0 && ' (discovering & indexing...)'}
+                                                {t('{indexed} indexed / {discovered} discovered', { indexed: indexingProgress.files_indexed, discovered: indexingProgress.files_discovered })}
+                                                {indexingProgress.files_discovered === 0 && t(' (starting…)')}
+                                                {indexingProgress.files_discovered > 0 && indexingProgress.files_indexed === 0 && t(' (discovering & indexing…)')}
                                             </span>
                                             {indexingProgress.estimated_time_remaining && indexingProgress.files_indexed > 0 && (
                                                 <span>
-                                                    {formatTimeRemaining(indexingProgress.estimated_time_remaining)} remaining
+                                                    {t('{time} remaining', { time: formatTimeRemaining(indexingProgress.estimated_time_remaining) })}
                                                 </span>
                                             )}
                                         </div>
@@ -1568,8 +1575,8 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                         {indexingProgress.current_path && (
                                             <div className="current-file">
                                                 <span className="current-file-label">
-                                                    {indexingProgress.files_discovered === 0 ? 'Starting:' : 
-                                                     indexingProgress.files_indexed === 0 ? 'Discovering:' : 'Processing:'}
+                                                    {indexingProgress.files_discovered === 0 ? t('Starting:') : 
+                                                     indexingProgress.files_indexed === 0 ? t('Discovering:') : t('Processing:')}
                                                 </span>
                                                 <span className="current-file-path" title={indexingProgress.current_path}>
                                                     {indexingProgress.current_path.split('/').pop() || indexingProgress.current_path}
@@ -1591,7 +1598,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                         }}
                                         className="stop-indexing-btn"
                                     >
-                                        Stop Indexing
+                                        {t('Stop Indexing')}
                                     </button>
                                 </>
                             )}
@@ -1610,7 +1617,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                             display: 'inline-block'
                                         }}></span>
                                     </div>
-                                    Checking if background indexing is in progress...
+                                    {t('Checking if background indexing is in progress…')}
                                 </div>
                             )}
                         </div>
@@ -1621,7 +1628,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                     {isSearching && (
                         <div className="search-progress-container">
                             <div className="progress-spinner"></div>
-                            <span>Searching indexed files...</span>
+                            <span>{t('Searching indexed files…')}</span>
                         </div>
                     )}
 
@@ -1632,12 +1639,12 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                 searchTerm={query}
                             />
                             <div className="no-results-help">
-                                <p>Tips:</p>
+                                <p>{t('Tips:')}</p>
                                 <ul>
-                                    <li>Make sure the backend has indexed your files</li>
-                                    <li>Try different keywords</li>
-                                    <li>Check spelling</li>
-                                    <li>Try using fewer or more specific terms</li>
+                                    <li>{t('Make sure the backend has indexed your files')}</li>
+                                    <li>{t('Try different keywords')}</li>
+                                    <li>{t('Check spelling')}</li>
+                                    <li>{t('Try using fewer or more specific terms')}</li>
                                 </ul>
                             </div>
                         </div>
@@ -1655,13 +1662,13 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                     paddingLeft: '15px',
                                     paddingRight: '12px'
                                 }}>
-                                    {results.length} results • ranked by {
-                                        sortBy === 'relevance' ? 'relevance' :
-                                        sortBy === 'name' ? 'name' :
-                                        sortBy === 'path' ? 'path' :
-                                        sortBy === 'extension' ? 'file type' :
-                                        'relevance'
-                                    }
+                                    {plural(results.length, { en: ['{count} result', '{count} results'], ru: ['{count} результат', '{count} результата', '{count} результатов'] })} • {t(
+                                        sortBy === 'relevance' ? 'ranked by relevance' :
+                                        sortBy === 'name' ? 'ranked by name' :
+                                        sortBy === 'path' ? 'ranked by path' :
+                                        sortBy === 'extension' ? 'ranked by file type' :
+                                        'ranked by relevance'
+                                    )}
                                 </div>
                                 {results.map((result, index) => (
                                     <div key={index} className="result-item-container">
@@ -1677,11 +1684,11 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                             <div
                                                 className="result-name-container"
                                                 onClick={() => openItemLocation(result)}
-                                                title={`Open location: ${result.directory}`}
+                                                title={t('Open location: {path}', { path: result.directory })}
                                             >
                                                 <span className="result-name">{result.name}</span>
                                                 {result.isDirectory && (
-                                                    <span className="result-type-indicator">(Directory)</span>
+                                                    <span className="result-type-indicator">{t('(Folder)')}</span>
                                                 )}
                                             </div>
                                             <div
@@ -1693,7 +1700,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                             </div>
                                             {currentDirectory && result.path.startsWith(currentDirectory) && (
                                                 <div className="result-context-indicator">
-                                                    <span className="context-dot">•</span> In current directory
+                                                    <span className="context-dot">•</span> {t('In current directory')}
                                                 </div>
                                             )}
                                         </div>
@@ -1702,7 +1709,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                                             <button
                                                 className="action-button-container"
                                                 onClick={() => openItemLocation(result)}
-                                                title="Open containing folder"
+                                                title={t('Open containing folder')}
                                             >
                                                 <span className="icon icon-folder"></span>
                                             </button>

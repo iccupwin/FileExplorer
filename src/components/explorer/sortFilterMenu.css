@@ -1,0 +1,155 @@
+.sort-filter-menu {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-right: 6px;
+}
+
+.sf-dropdown {
+    position: relative;
+}
+
+.sf-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 8px;
+    border: none;
+    border-radius: var(--radius-md, 6px);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 13px;
+    cursor: default;
+    white-space: nowrap;
+}
+
+.sf-button:hover,
+.sf-button.open {
+    background: var(--finder-hover, rgba(0, 0, 0, 0.05));
+    color: var(--text-primary);
+}
+
+.sf-button-icon {
+    position: relative;
+    width: 32px;
+    padding: 0;
+    justify-content: center;
+}
+
+.sf-button.active {
+    color: var(--accent);
+}
+
+.sf-badge {
+    position: absolute;
+    top: 2px;
+    right: 1px;
+    min-width: 13px;
+    height: 13px;
+    padding: 0 3px;
+    border-radius: 7px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 13px;
+    text-align: center;
+}
+
+.sf-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    z-index: var(--z-index-popover, 60);
+    min-width: 210px;
+    padding: 5px;
+    border-radius: 9px;
+    background: var(--finder-menu-bg, rgba(246, 246, 246, 0.95));
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border: 0.5px solid var(--finder-hairline, rgba(0, 0, 0, 0.1));
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+}
+
+.sf-menu-right {
+    right: 0;
+}
+
+.sf-menu-left {
+    left: 0;
+}
+
+.sf-heading {
+    padding: 4px 10px 2px 26px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+}
+
+.sf-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 24px;
+    padding: 0 10px 0 6px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    text-align: left;
+    cursor: default;
+}
+
+.sf-item:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.sf-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    flex: 0 0 20px;
+}
+
+.sf-item-label {
+    flex: 1;
+    white-space: nowrap;
+}
+
+.sf-separator {
+    height: 1px;
+    margin: 5px 10px;
+    background: var(--finder-hairline, rgba(0, 0, 0, 0.1));
+}
+
+/* Shown in the file list when the filters hide everything */
+.filter-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 48px 16px;
+    color: var(--text-tertiary);
+    font-size: 13px;
+}
+
+.filter-empty-state p {
+    margin: 0;
+}
+
+.filter-clear-button {
+    height: 26px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 6px;
+    background: var(--finder-control-bg, rgba(0, 0, 0, 0.06));
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.filter-clear-button:hover {
+    background: var(--surface-active);
+}

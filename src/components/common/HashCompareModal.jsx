@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { showError, showSuccess } from '../../utils/NotificationSystem';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
+import { useI18n } from '../../i18n';
 
 /**
  * Modal component for comparing file or directory hash with a provided hash value
@@ -16,6 +17,7 @@ import Button from '../common/Button';
  */
 const HashCompareModal = ({ isOpen, onClose, item }) => {
     const [hashValue, setHashValue] = useState('');
+    const { t } = useI18n();
     const [isComparing, setIsComparing] = useState(false);
     const inputRef = useRef(null);
 
@@ -50,14 +52,14 @@ const HashCompareModal = ({ isOpen, onClose, item }) => {
             });
 
             if (matches) {
-                showSuccess('✓ Hash matches! File integrity verified.');
+                showSuccess(t('✓ Hash matches! File integrity verified.'));
             } else {
-                showError('✗ Hash does not match! File may be corrupted or modified.');
+                showError(t('✗ Hash does not match! File may be corrupted or modified.'));
             }
             onClose();
         } catch (error) {
             console.error('Hash comparison failed:', error);
-            showError(`Failed to compare hash: ${error.message || error}`);
+            showError(t('Failed to compare hash: {error}', { error: error.message || error }));
         } finally {
             setIsComparing(false);
         }
@@ -104,7 +106,7 @@ const HashCompareModal = ({ isOpen, onClose, item }) => {
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title="Compare Hash"
+            title={t('Compare Hash')}
             size="md"
             footer={
                 <>
@@ -113,7 +115,7 @@ const HashCompareModal = ({ isOpen, onClose, item }) => {
                         onClick={onClose}
                         disabled={isComparing}
                     >
-                        Cancel
+                        {t('Cancel')}
                     </Button>
                     <Button
                         type="submit"
@@ -121,7 +123,7 @@ const HashCompareModal = ({ isOpen, onClose, item }) => {
                         disabled={!hashValue.trim() || isComparing}
                         onClick={handleSubmit}
                     >
-                        {isComparing ? 'Comparing...' : 'Compare Hash'}
+                        {isComparing ? t('Comparing...') : t('Compare Hash')}
                     </Button>
                 </>
             }
@@ -129,7 +131,7 @@ const HashCompareModal = ({ isOpen, onClose, item }) => {
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
                     <label htmlFor="hash-value">
-                        Hash value to compare:
+                        {t('Hash value to compare:')}
                     </label>
                     <textarea
                         ref={inputRef}
@@ -139,14 +141,13 @@ const HashCompareModal = ({ isOpen, onClose, item }) => {
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
                         className="input"
-                        placeholder="Enter or paste the hash value to compare against"
+                        placeholder={t('Enter or paste the hash value to compare against')}
                         rows={4}
                         disabled={isComparing}
                         style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: '13px' }}
                     />
                     <div className="input-hint">
-                        Enter the hash value you want to compare "{item.name}" against.
-                        The comparison will verify the file's integrity.
+                        {t('Enter the hash value you want to compare "{name}" against. The comparison will verify the file\'s integrity.', { name: item.name })}
                     </div>
                 </div>
             </form>

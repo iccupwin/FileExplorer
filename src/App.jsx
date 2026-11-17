@@ -7,9 +7,11 @@ import SftpProvider from './providers/SftpProvider';
 import FileSystemProvider from './providers/FileSystemProvider';
 import ContextMenuProvider from './providers/ContextMenuProvider';
 import MainLayout from './layouts/MainLayout';
+import { useI18n } from './i18n';
 
 // Simple fallback for error cases
 function ErrorFallback() {
+    const { t } = useI18n();
     return (
         <div style={{
             padding: '20px',
@@ -23,8 +25,8 @@ function ErrorFallback() {
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
         }}>
             <h1 style={{ color: '#d32f2f' }}>Fast File Explorer</h1>
-            <p>The application could not be loaded properly. Try refreshing the page.</p>
-            <p>If the problem persists, check the console (F12) for error messages.</p>
+            <p>{t('The application could not be loaded properly. Try refreshing the page.')}</p>
+            <p>{t('If the problem persists, check the console (F12) for error messages.')}</p>
             <button
                 onClick={() => window.location.reload()}
                 style={{
@@ -37,7 +39,7 @@ function ErrorFallback() {
                     marginTop: '15px'
                 }}
             >
-                Reload Page
+                {t('Reload Page')}
             </button>
         </div>
     );

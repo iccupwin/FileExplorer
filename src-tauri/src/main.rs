@@ -10,7 +10,7 @@ mod state;
 
 use crate::commands::{
     command_exec_commands, file_system_operation_commands, hash_commands, meta_data_commands,
-    search_engine_commands, settings_commands, template_commands, volume_operations_commands, sftp_file_system_operation_commands, preview_commands, permission_commands
+    search_engine_commands, settings_commands, template_commands, volume_operations_commands, sftp_file_system_operation_commands, preview_commands, permission_commands, thumbnail_commands, spotlight_commands, watch_commands, transfer_commands
 };
 use tauri::ipc::Invoke;
 use tauri::Manager;
@@ -20,6 +20,7 @@ fn all_commands() -> fn(Invoke) -> bool {
         // Filesystem commands
         //file_system_operation_commands::open_file,
         file_system_operation_commands::open_directory,
+        file_system_operation_commands::count_directory_entries,
         file_system_operation_commands::open_in_default_app,
         file_system_operation_commands::create_file,
         file_system_operation_commands::create_directory,
@@ -91,14 +92,38 @@ fn all_commands() -> fn(Invoke) -> bool {
         // Permission commands
         permission_commands::request_full_disk_access,
         permission_commands::check_directory_access,
+
+        // Thumbnail commands
+        thumbnail_commands::get_thumbnail,
+        thumbnail_commands::get_file_icon,
+
+        // Spotlight search (macOS)
+        spotlight_commands::spotlight_search,
+
+        // Live folder refresh
+        watch_commands::watch_directory,
+
+        // Drag and drop
+        transfer_commands::transfer_items,
     ]
 }
 
 #[tokio::main]
 async fn main() {
+    // config/ and logs/ are resolved relative to the current dir; when launched
+    // from Finder that is "/", so move to a writable per-user data dir first.
+    if let Some(home) = std::env::var_os("HOME") {
+        let data_dir = std::path::Path::new(&home)
+            .join("Library/Application Support/com.explr.app");
+        if std::fs::create_dir_all(&data_dir).is_ok() {
+            let _ = std::env::set_current_dir(&data_dir);
+        }
+    }
+
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_drag::init())
         .invoke_handler(all_commands())
         .setup(|app| {
             // Safely show/focus the main window if it exists
