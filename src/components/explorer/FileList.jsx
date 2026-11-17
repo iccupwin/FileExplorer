@@ -2,8 +2,13 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useFileSystem } from '../../providers/FileSystemProvider';
 import { useContextMenu } from '../../providers/ContextMenuProvider';
 import { useHistory } from '../../providers/HistoryProvider';
+import { invoke } from '@tauri-apps/api/core';
 import { beginDragGesture } from '../../hooks/useFileDragDrop';
 import useMarqueeSelection from '../../hooks/useMarqueeSelection';
+import useVirtualRows from '../../hooks/useVirtualRows';
+
+// Folders bigger than this render only the visible rows
+const VIRTUAL_THRESHOLD = 1500;
 import { showError } from '../../utils/NotificationSystem';
 import FileItem from './FileItem';
 import useSortFilter, { applySortFilter, isFilterActive, sortFilterActions } from '../../hooks/useSortFilter';
@@ -32,6 +37,7 @@ const FileList = ({ data, isLoading, viewMode = 'grid', isSearching = false, sea
     const sortConfig = { key: sortFilter.sortKey, direction: sortFilter.direction };
     const [columnsPerRow, setColumnsPerRow] = useState(4); // Dynamic column calculation
     const containerRef = useRef(null);
+    const listRef = useRef(null);
     // Selection anchor (Windows-style): Shift+click / Shift+arrow select the range
     // from this index to the target. A ref avoids stale values in key handlers.
     const anchorRef = useRef(-1);
@@ -196,6 +202,21 @@ const FileList = ({ data, isLoading, viewMode = 'grid', isSearching = false, sea
     // Sorting is expensive for big folders: only redo it when data or sort settings change
     const sortedItems = useMemo(getSortedData, [data, sortFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Finder colour tags for the items in this folder (macOS), read in one call
+    const [tagMap, setTagMap] = useState({});
+    useEffect(() => {
+        const isMac = /Mac/i.test(navigator.platform || navigator.userAgent);
+        const paths = sortedItems.map(i => i.path).filter(p => typeof p === 'string' && p.startsWith('/'));
+        if (!isMac || !paths.length) { setTagMap({}); return undefined; }
+        let cancelled = false;
+        const load = () => invoke('get_tags', { paths })
+            .then(map => { if (!cancelled) setTagMap(map || {}); })
+            .catch(() => { if (!cancelled) setTagMap({}); });
+        load();
+        window.addEventListener('tags-changed', load);
+        return () => { cancelled = true; window.removeEventListener('tags-changed', load); };
+    }, [sortedItems]);
+
     // O(1) lookups instead of scanning the selection for every item
     const selectedPaths = useMemo(() => new Set(selectedItems.map(i => i.path)), [selectedItems]);
     const cutPaths = useMemo(
@@ -212,9 +233,23 @@ const FileList = ({ data, isLoading, viewMode = 'grid', isSearching = false, sea
     const onItemMouseDown = useCallback((e, item, index) => itemHandlersRef.current.mouseDown(e, item, index), []);
 
     // Rubber-band selection on empty space (like Finder)
+    // Very large folders: render only visible rows (fixed row height)
+    const isVirtual = sortedItems.length > VIRTUAL_THRESHOLD;
+    const virtualRows = useVirtualRows({
+        containerRef,
+        listRef,
+        count: sortedItems.length,
+        columns: viewMode === 'grid' ? columnsPerRow : 1,
+        enabled: isVirtual,
+    });
+    const scrollToIndexRef = useRef(null);
+    scrollToIndexRef.current = isVirtual ? virtualRows.scrollToIndex : null;
+
     const marquee = useMarqueeSelection(containerRef, {
         items: sortedItems,
         selectedItems,
+        // Off-screen rows don't exist in the DOM when virtualized: use computed geometry
+        getBoxes: isVirtual ? () => virtualRows.getBoxes(sortedItems.map(i => i.path)) : null,
         onSelect: (next) => {
             selectMultiple(next);
             if (next.length) {
@@ -256,14 +291,12 @@ const FileList = ({ data, isLoading, viewMode = 'grid', isSearching = false, sea
                 return;
             }
 
+            // Return renames, like Finder (open with Cmd+Down or a double click)
             if (e.key === 'Enter') {
-                if (focusedItem) {
+                const target = selectedItems.length === 1 ? selectedItems[0] : (selectedItems.length === 0 ? focusedItem : null);
+                if (target) {
                     e.preventDefault();
-                    if (focusedItem.isDirectory) {
-                        loadDirectory(focusedItem.path);
-                    } else {
-                        openFile(focusedItem.path);
-                    }
+                    document.dispatchEvent(new CustomEvent('open-rename-modal', { detail: { item: target } }));
                 }
                 return;
             }
@@ -339,7 +372,12 @@ const FileList = ({ data, isLoading, viewMode = 'grid', isSearching = false, sea
             }
             setFocusedItem(item);
 
-            // Keep the focused item visible
+            // Keep the focused item visible (also when its row isn't rendered yet:
+            // in virtual mode the position is computed, so scroll right away)
+            if (scrollToIndexRef.current) {
+                scrollToIndexRef.current(next);
+                return;
+            }
             requestAnimationFrame(() => {
                 const el = document.querySelector(`.file-list [data-path="${CSS.escape(item.path)}"]`);
                 if (el) el.scrollIntoView({ block: 'nearest' });
@@ -608,10 +646,16 @@ const FileList = ({ data, isLoading, viewMode = 'grid', isSearching = false, sea
 
                 {/* File list content */}
                 <div
-                    className={`file-list view-mode-${viewMode.toLowerCase()} scrollable-content`}
-                    style={{ '--icon-size': `${sortFilter.iconSize}px` }}
+                    ref={listRef}
+                    className={`file-list view-mode-${viewMode.toLowerCase()} scrollable-content ${isVirtual ? 'virtual' : ''}`}
+                    style={{
+                        '--icon-size': `${sortFilter.iconSize}px`,
+                        ...(isVirtual ? { '--vtop': `${virtualRows.topSpacer}px`, '--vbottom': `${virtualRows.bottomSpacer}px` } : null),
+                    }}
                 >
-                    {sortedItems.map((item, index) => (
+                    {(isVirtual ? sortedItems.slice(virtualRows.startIndex, virtualRows.endIndex) : sortedItems).map((item, i) => {
+                        const index = isVirtual ? virtualRows.startIndex + i : i;
+                        return (
                         <FileItem
                             key={item.path}
                             item={item}
@@ -620,12 +664,14 @@ const FileList = ({ data, isLoading, viewMode = 'grid', isSearching = false, sea
                             isSelected={selectedPaths.has(item.path)}
                             isFocused={!!focusedItem && focusedItem.path === item.path}
                             isCut={cutPaths.has(item.path)}
+                            tags={tagMap[item.path] || null}
                             onClick={onItemClick}
                             onDoubleClick={onItemDoubleClick}
                             onContextMenu={onItemContextMenu}
                             onMouseDown={onItemMouseDown}
                         />
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
             <StatusBar itemCount={sortedItems.length} currentPath={currentPath} viewMode={viewMode} />

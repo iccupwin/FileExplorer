@@ -18,11 +18,30 @@ const detectLanguage = () => {
     } catch {
         // storage unavailable
     }
-    const nav = (typeof navigator !== 'undefined' && navigator.language) || '';
-    return nav.toLowerCase().startsWith('ru') ? 'ru' : 'en';
+    // Russian if it is anywhere in the user's preferred languages (e.g. macOS set to
+    // English with Russian as a second language); can be changed in Settings.
+    const langs = typeof navigator !== 'undefined'
+        ? [...(navigator.languages || []), navigator.language || '']
+        : [];
+    return langs.some((l) => String(l).toLowerCase().startsWith('ru')) ? 'ru' : 'en';
 };
 
 let currentLanguage = detectLanguage();
+let languageChosen = (() => {
+    try { return SUPPORTED.includes(localStorage.getItem(STORAGE_KEY)); } catch { return false; }
+})();
+
+// WebKit only exposes the primary system language; ask macOS for the full list
+// (no saved choice yet) and switch to Russian if the user has it anywhere.
+if (!languageChosen && typeof window !== 'undefined' && window.__TAURI_INTERNALS__) {
+    import('@tauri-apps/api/core')
+        .then(({ invoke }) => invoke('preferred_languages'))
+        .then((langs) => {
+            if (languageChosen || currentLanguage === 'ru') return;
+            if ((langs || []).some((l) => String(l).toLowerCase().startsWith('ru'))) applyLanguage('ru');
+        })
+        .catch(() => {});
+}
 const listeners = new Set();
 
 const applyDocumentLanguage = () => {
@@ -39,16 +58,24 @@ export const getLanguage = () => currentLanguage;
 /** BCP 47 locale for Intl APIs. */
 export const getLocale = () => (currentLanguage === 'ru' ? 'ru-RU' : 'en-US');
 
-export const setLanguage = (language) => {
+/** Switches the UI language without remembering it (automatic detection). */
+const applyLanguage = (language) => {
     if (!SUPPORTED.includes(language) || language === currentLanguage) return;
     currentLanguage = language;
+    applyDocumentLanguage();
+    listeners.forEach((listener) => listener());
+};
+
+/** The user's explicit choice (Settings): applied and remembered. */
+export const setLanguage = (language) => {
+    if (!SUPPORTED.includes(language)) return;
+    languageChosen = true;
     try {
         localStorage.setItem(STORAGE_KEY, language);
     } catch {
         // storage unavailable
     }
-    applyDocumentLanguage();
-    listeners.forEach((listener) => listener());
+    applyLanguage(language);
 };
 
 const subscribe = (listener) => {

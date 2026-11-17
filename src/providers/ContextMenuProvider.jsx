@@ -1,4 +1,16 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import * as fileOps from '../services/fileOps';
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform || navigator.userAgent);
+// Finder tag colours (number stored by macOS) in Finder's menu order
+const TAG_MENU = [
+    { color: 6, name: 'Red' }, { color: 7, name: 'Orange' }, { color: 5, name: 'Yellow' },
+    { color: 2, name: 'Green' }, { color: 4, name: 'Blue' }, { color: 3, name: 'Purple' }, { color: 1, name: 'Gray' },
+];
+// extension -> [{ name, path, is_default }] for "Open With"
+const openWithCache = new Map();
+const extOf = (name) => (name && name.includes('.') ? name.split('.').pop().toLowerCase() : `noext:${name}`);
+const parentOf = (path) => path.substring(0, path.lastIndexOf('/')) || '/';
 import { invoke } from '@tauri-apps/api/core';
 import { useFileSystem } from './FileSystemProvider';
 import { useHistory } from './HistoryProvider';
@@ -240,11 +252,21 @@ export default function ContextMenuProvider({ children }) {
     }, [currentDirData]);
 
     // Paste items from clipboard - enhanced with SFTP support
-    const pasteFromClipboard = useCallback(async () => {
+    const pasteFromClipboard = useCallback(async (forceMove = false) => {
         if (!clipboard.items.length || !currentPath) return;
 
         setIsProcessing(true);
         try {
+            // Local -> local: one transfer with progress, conflict handling and undo
+            const isLocalPath = (p) => typeof p === 'string' && p.startsWith('/');
+            if (isLocalPath(currentPath) && clipboard.items.every(i => isLocalPath(i.path))) {
+                await fileOps.transfer(clipboard.items.map(i => i.path), currentPath, {
+                    mode: (clipboard.operation === 'cut' || forceMove === true) ? 'move' : 'copy',
+                });
+                if (clipboard.operation === 'cut') setClipboard({ items: [], operation: null });
+                return;
+            }
+
             for (const item of clipboard.items) {
                 const fileName = item.name;
                 const sourcePath = item.path;
@@ -325,22 +347,22 @@ export default function ContextMenuProvider({ children }) {
     // Delete items
     const deleteItems = useCallback(async (items) => {
         if (!items.length) return;
-
-        const itemNames = items.map(item => item.name).join(', ');
-        const confirmMessage = t('Are you sure you want to move {items} to the Trash?', { items: items.length === 1 ? itemNames : plural(items.length, PLURALS.items) });
-
-        // Use custom confirm dialog
-        const shouldDelete = await showConfirm(confirmMessage, t('Move to Trash'));
-        if (!shouldDelete) return;
-
+        const local = items.filter(item => typeof item.path === 'string' && item.path.startsWith('/'));
+        const remote = items.filter(item => !local.includes(item));
         setIsProcessing(true);
         try {
-            // Call moveToTrash for each item - it handles SFTP vs local paths and directory reload
-            for (const item of items) {
-                await moveToTrash(item.path);
+            // Local items: straight to the Trash like Finder (Cmd+Z puts them back)
+            if (local.length) await fileOps.trash(local.map(item => item.path));
+            // SFTP items can't be restored, so keep the confirmation for them
+            if (remote.length) {
+                const names = remote.map(item => item.name).join(', ');
+                const ok = await showConfirm(
+                    t('Are you sure you want to move {items} to the Trash?', { items: remote.length === 1 ? names : plural(remote.length, PLURALS.items) }),
+                    t('Move to Trash')
+                );
+                if (ok) for (const item of remote) await moveToTrash(item.path);
             }
         } catch (error) {
-            console.error('Delete operation failed:', error);
             showError(t('Failed to delete: {error}', { error: error.message || error }));
         } finally {
             setIsProcessing(false);
@@ -983,6 +1005,83 @@ export default function ContextMenuProvider({ children }) {
         );
 
         // Add properties at the end
+        // Finder helpers (local items on macOS)
+        const targetIsLocal = typeof contextTarget.path === 'string' && contextTarget.path.startsWith('/');
+        if (IS_MAC && targetIsLocal) {
+            const inSelection = selectedItems.some(i => i.path === contextTarget.path);
+            const targets = (inSelection ? selectedItems : [contextTarget]).filter(i => i.path.startsWith('/'));
+            const paths = targets.map(i => i.path);
+            const finderItems = [
+                { type: 'separator' },
+                {
+                    id: 'quick-look',
+                    label: 'Quick Look',
+                    icon: 'eye',
+                    action: () => invoke('quick_look', { paths, index: Math.max(0, paths.indexOf(contextTarget.path)) }).catch(err => showError(String(err))),
+                },
+            ];
+            if (isFile) {
+                const apps = openWithCache.get(extOf(contextTarget.name));
+                finderItems.push({
+                    id: 'open-with',
+                    label: 'Open With',
+                    icon: 'open',
+                    submenu: apps === undefined
+                        ? [{ id: 'open-with-loading', label: 'Loading…', disabled: true }]
+                        : apps.length === 0
+                            ? [{ id: 'open-with-none', label: 'No applications found', disabled: true }]
+                            : apps.map((app, i) => ({
+                                id: `open-with-${i}`,
+                                label: app.is_default ? `${app.name} ${t('(default)')}` : app.name,
+                                action: () => invoke('open_with', { paths, appPath: app.path }).catch(err => showError(String(err))),
+                            })),
+                });
+            }
+            finderItems.push(
+                {
+                    id: 'tags',
+                    label: 'Tags',
+                    icon: 'tag',
+                    submenu: TAG_MENU.map(tag => ({
+                        id: `tag-${tag.color}`,
+                        label: tag.name,
+                        icon: `tag-dot tag-color-${tag.color}`,
+                        // Toggle: remove when every selected item already has it, otherwise add
+                        action: async () => {
+                            try {
+                                const current = await invoke('get_tags', { paths });
+                                const allHave = paths.every(p => (current[p] || []).some(tg => tg.color === tag.color));
+                                await invoke('set_tag', { paths, name: t(tag.name), color: tag.color, add: !allHave });
+                                window.dispatchEvent(new CustomEvent('tags-changed'));
+                            } catch (err) {
+                                showError(String(err));
+                            }
+                        },
+                    })),
+                },
+                { type: 'separator' },
+                {
+                    id: 'show-in-finder',
+                    label: 'Show in Finder',
+                    icon: 'folder-open',
+                    action: () => invoke('reveal_in_finder', { paths }).catch(err => showError(String(err))),
+                },
+                {
+                    id: 'open-terminal-here',
+                    label: 'Open Terminal Here',
+                    icon: 'terminal',
+                    action: () => invoke('open_terminal_here', { path: isDirectory ? contextTarget.path : parentOf(contextTarget.path) }).catch(err => showError(String(err))),
+                },
+                {
+                    id: 'share-airdrop',
+                    label: 'Share via AirDrop',
+                    icon: 'airdrop',
+                    action: () => invoke('share_airdrop', { paths }).catch(err => showError(String(err))),
+                },
+            );
+            menuItems.push(...finderItems);
+        }
+
         menuItems.push(
             { type: 'separator' },
             {
@@ -1009,6 +1108,22 @@ export default function ContextMenuProvider({ children }) {
         setTarget(contextTarget);
         setItems(menuItems);
         setIsOpen(true);
+
+        const isLocalFile = IS_MAC && contextTarget && !contextTarget.isDirectory && !('sub_file_count' in contextTarget)
+            && typeof contextTarget.path === 'string' && contextTarget.path.startsWith('/');
+        const key = isLocalFile ? extOf(contextTarget.name) : null;
+        if (key && !openWithCache.has(key)) {
+            invoke('open_with_apps', { path: contextTarget.path })
+                .then(apps => openWithCache.set(key, apps))
+                .catch(() => openWithCache.set(key, []))
+                .finally(() => {
+                    // Rebuild only if the menu is still showing this item
+                    setTarget(current => {
+                        if (current && current.path === contextTarget.path) setItems(getMenuItemsForContext(contextTarget));
+                        return current;
+                    });
+                });
+        }
     }, [getMenuItemsForContext]);
 
     // Close context menu

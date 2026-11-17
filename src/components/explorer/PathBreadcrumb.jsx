@@ -38,6 +38,17 @@ const PathBreadcrumb = ({ onCopyPath, isVisible = true, onSearch }) => {
         const segments = [];
         let currentSegment = '';
 
+        // Virtual locations (Recents, colour tags) show a single title
+        if (currentPath.startsWith('explr://')) {
+            const TAG_NAMES = ['Gray', 'Gray', 'Green', 'Purple', 'Blue', 'Yellow', 'Red', 'Orange'];
+            const name = currentPath === 'explr://recents'
+                ? t('Recents')
+                : currentPath.startsWith('explr://tag/')
+                    ? t(TAG_NAMES[Number(currentPath.slice('explr://tag/'.length))] || 'Tags')
+                    : currentPath;
+            return [{ name, path: currentPath, displayPath: name }];
+        }
+
         // Handle SFTP paths (sftp:connectionName:remotePath)
         if (isSftpPath(currentPath)) {
             const parsed = parseSftpPath(currentPath);

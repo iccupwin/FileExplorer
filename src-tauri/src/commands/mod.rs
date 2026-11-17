@@ -13,3 +13,5 @@ pub mod thumbnail_commands;
 pub mod spotlight_commands;
 pub mod watch_commands;
 pub mod transfer_commands;
+pub mod macos_commands;
+pub mod locale_commands;

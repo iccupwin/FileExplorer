@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { invoke, Channel } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
+import * as fileOps from '../services/fileOps';
 
 const DRAG_THRESHOLD = 5; // px the mouse must travel before a drag starts
 const DROP_CLASS = 'drop-target';
@@ -52,6 +53,22 @@ export function beginDragGesture(event, getDragItems) {
     window.addEventListener('mouseup', cleanup);
 }
 
+/** Adds dropped folders to the sidebar Favorites (stored like the context-menu action). */
+function addFavorites(paths) {
+    try {
+        const existing = JSON.parse(localStorage.getItem('fileExplorerFavorites') || '[]');
+        const known = new Set(existing.map((f) => f.path));
+        const added = paths
+            .filter((p) => p.startsWith('/') && !known.has(p))
+            .map((p) => ({ name: p.split('/').filter(Boolean).pop() || p, path: p, icon: 'folder' }));
+        if (!added.length) return;
+        localStorage.setItem('fileExplorerFavorites', JSON.stringify([...existing, ...added]));
+        window.dispatchEvent(new CustomEvent('favorites-updated'));
+    } catch {
+        // storage unavailable: nothing to do
+    }
+}
+
 /** Finds the folder under a window position: a folder item, a sidebar entry or the open folder. */
 function findDropTarget(position, currentPath) {
     const scale = window.devicePixelRatio || 1;
@@ -60,6 +77,10 @@ function findDropTarget(position, currentPath) {
 
     const folderItem = el.closest('.file-item.directory[data-path]');
     if (folderItem) return { path: folderItem.dataset.path, element: folderItem };
+
+    // Dropping folders on the Favorites section adds them (like Finder)
+    const favorites = el.closest('[data-drop-favorites]');
+    if (favorites && !el.closest('[data-drop-path]')) return { favorites: true, element: favorites };
 
     const sidebarItem = el.closest('[data-drop-path]');
     if (sidebarItem) {
@@ -108,15 +129,17 @@ export default function useFileDragDrop({ currentPath, onTransferred, onError })
                     setHighlight(null);
                     const paths = event.payload.paths || [];
                     if (!target || !paths.length) return;
+                    if (target.favorites) {
+                        addFavorites(paths);
+                        return;
+                    }
                     // Ignore dropping a folder onto itself
                     const sources = paths.filter((p) => p !== target.path);
                     if (!sources.length) return;
-                    try {
-                        const moved = await invoke('transfer_items', { paths: sources, targetDir: target.path });
-                        s.onTransferred?.(moved, target.path);
-                    } catch (err) {
-                        s.onError?.(String(err));
-                    }
+                    // Finder semantics (move on same disk, copy across disks), with progress,
+                    // conflict dialog and Cmd+Z undo
+                    const results = await fileOps.transfer(sources, target.path, { mode: 'auto' });
+                    s.onTransferred?.(results, target.path);
                 }
             })
             .then((fn) => {

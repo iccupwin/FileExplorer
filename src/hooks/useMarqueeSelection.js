@@ -17,10 +17,10 @@ const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.b
  * @param {Function} options.onSelect - called with the new selection (array of items)
  * @returns {{ onMouseDown: Function, rect: Object|null, consumeClick: () => boolean }}
  */
-export default function useMarqueeSelection(containerRef, { items, selectedItems, onSelect }) {
+export default function useMarqueeSelection(containerRef, { items, selectedItems, onSelect, getBoxes = null }) {
     const [rect, setRect] = useState(null); // in container content coordinates
-    const latest = useRef({ items, selectedItems, onSelect });
-    latest.current = { items, selectedItems, onSelect };
+    const latest = useRef({ items, selectedItems, onSelect, getBoxes });
+    latest.current = { items, selectedItems, onSelect, getBoxes };
     const suppressClickRef = useRef(false);
     const sessionRef = useRef(null);
 
@@ -53,8 +53,9 @@ export default function useMarqueeSelection(containerRef, { items, selectedItems
 
         // Item boxes in content coordinates (layout doesn't change during the drag)
         const b0 = container.getBoundingClientRect();
-        const boxes = [];
-        container.querySelectorAll('.file-item[data-path]').forEach((el) => {
+        // Virtualized lists provide computed boxes (rows off screen aren't in the DOM)
+        const boxes = latest.current.getBoxes ? latest.current.getBoxes() : [];
+        if (!latest.current.getBoxes) container.querySelectorAll('.file-item[data-path]').forEach((el) => {
             const r = el.getBoundingClientRect();
             boxes.push({
                 path: el.dataset.path,

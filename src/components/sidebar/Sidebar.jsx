@@ -14,6 +14,19 @@ import {open} from '@tauri-apps/plugin-dialog';
 import './sidebar.css';
 import {showConfirm, showError, showSuccess} from "../../utils/NotificationSystem.js";
 import { useI18n } from '../../i18n';
+import { invoke } from '@tauri-apps/api/core';
+
+// Finder tag colours: number stored by macOS -> name and display colour
+const TAG_COLORS = [
+    { color: 6, name: 'Red', hex: '#ff453a' },
+    { color: 7, name: 'Orange', hex: '#ff9f0a' },
+    { color: 5, name: 'Yellow', hex: '#ffd60a' },
+    { color: 2, name: 'Green', hex: '#30d158' },
+    { color: 4, name: 'Blue', hex: '#0a84ff' },
+    { color: 3, name: 'Purple', hex: '#bf5af2' },
+    { color: 1, name: 'Gray', hex: '#98989d' },
+];
+const IS_MAC = /Mac/i.test(navigator.platform || navigator.userAgent);
 
 /**
  * Sidebar component - Provides navigation, favorites, and quick access
@@ -26,7 +39,7 @@ import { useI18n } from '../../i18n';
  */
 const Sidebar = ({ onTerminalToggle, isTerminalOpen, currentView }) => {
     const { t } = useI18n();
-    const { volumes, loadDirectory, loadVolumes } = useFileSystem();
+    const { volumes, loadDirectory, loadVolumes, selectedItems } = useFileSystem();
     const { currentPath, navigateTo } = useHistory();
     const { removeFromFavorites } = useContextMenu();
     const { navigateToSftpConnection, createSftpUrl, isSftpPath, parseSftpPath, createSftpPath } = useSftp();
@@ -421,6 +434,31 @@ const Sidebar = ({ onTerminalToggle, isTerminalOpen, currentView }) => {
                         </div>
                         {!sectionCollapsed.thisPC && (
                             <ul className="sidebar-list">
+                                {IS_MAC && (
+                                    <SidebarItem
+                                        icon="recents"
+                                        name={t('Recents')}
+                                        path="explr://recents"
+                                        isActive={currentView === 'explorer' && currentPath === 'explr://recents'}
+                                        onClick={() => handleItemClick('explr://recents', t('Recents'))}
+                                    />
+                                )}
+                                {IS_MAC && (
+                                    <SidebarItem
+                                        icon="airdrop"
+                                        name={t('AirDrop')}
+                                        path="explr://airdrop"
+                                        isActive={false}
+                                        onClick={() => {
+                                            // With a selection: send it via AirDrop; otherwise open the AirDrop window
+                                            const local = (selectedItems || []).map(i => i.path).filter(p => p && p.startsWith('/'));
+                                            const action = local.length
+                                                ? invoke('share_airdrop', { paths: local })
+                                                : invoke('open_with', { paths: [], appPath: '/System/Library/CoreServices/Finder.app/Contents/Applications/AirDrop.app' });
+                                            action.catch(err => showError(String(err)));
+                                        }}
+                                    />
+                                )}
                                 <SidebarItem
                                     icon="computer"
                                     name={t('This PC')}
@@ -463,12 +501,22 @@ const Sidebar = ({ onTerminalToggle, isTerminalOpen, currentView }) => {
                                         />
                                     );
                                 })}
+
+                                {IS_MAC && userVolume && (
+                                    <SidebarItem
+                                        icon="trash"
+                                        name={t('Trash')}
+                                        path={`${userVolume.mount_point.replace(/\/$/, '')}/.Trash`}
+                                        isActive={currentView === 'explorer' && currentPath === `${userVolume.mount_point.replace(/\/$/, '')}/.Trash`}
+                                        onClick={() => handleItemClick(`${userVolume.mount_point.replace(/\/$/, '')}/.Trash`, t('Trash'))}
+                                    />
+                                )}
                             </ul>
                         )}
                     </section>
 
-                    {/* Favorites section */}
-                    <section className="sidebar-section">
+                    {/* Favorites section (drop folders here to add them) */}
+                    <section className="sidebar-section" data-drop-favorites="true">
                         <div className="sidebar-section-header">
                             <h3 className="sidebar-section-title">{t('Favorites')}</h3>
                             <div className="sidebar-section-actions">
@@ -498,6 +546,36 @@ const Sidebar = ({ onTerminalToggle, isTerminalOpen, currentView }) => {
                             />
                         )}
                     </section>
+
+                    {/* Finder colour tags */}
+                    {IS_MAC && (
+                        <section className="sidebar-section">
+                            <div className="sidebar-section-header">
+                                <h3 className="sidebar-section-title">{t('Tags')}</h3>
+                                <button
+                                    className="section-collapse-button"
+                                    onClick={() => toggleSectionCollapse('tags')}
+                                    aria-label={t('Tags')}
+                                >
+                                    <span className={`icon icon-chevron-${sectionCollapsed.tags ? 'up' : 'down'}`}></span>
+                                </button>
+                            </div>
+                            {!sectionCollapsed.tags && (
+                                <ul className="sidebar-list">
+                                    {TAG_COLORS.map(tag => (
+                                        <SidebarItem
+                                            key={tag.color}
+                                            icon={`tag-dot tag-color-${tag.color}`}
+                                            name={t(tag.name)}
+                                            path={`explr://tag/${tag.color}`}
+                                            isActive={currentView === 'explorer' && currentPath === `explr://tag/${tag.color}`}
+                                            onClick={() => handleItemClick(`explr://tag/${tag.color}`, t(tag.name))}
+                                        />
+                                    ))}
+                                </ul>
+                            )}
+                        </section>
+                    )}
 
                     {/* Drives/Volumes section */}
                     <section className="sidebar-section">

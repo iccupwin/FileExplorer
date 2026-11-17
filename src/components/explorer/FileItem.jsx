@@ -32,7 +32,8 @@ const FileItem = ({
                       onContextMenu,
                       onMouseDown: onItemMouseDown,
                       index = 0,
-                      isCut = false
+                      isCut = false,
+                      tags = null
                   }) => {
     const { t } = useI18n();
 
@@ -128,6 +129,11 @@ const FileItem = ({
 
                         <div className="file-name truncate" title={item.name}>
                             {item.name}
+                            {tags && tags.length > 0 && (
+                                <span className="file-tags" aria-label={tags.map(tg => tg.name).join(', ')}>
+                                    {tags.map(tg => <span key={`${tg.color}-${tg.name}`} className={`tag-dot tag-color-${tg.color}`} title={tg.name} />)}
+                                </span>
+                            )}
                         </div>
                     </div>
                 )}
@@ -141,6 +147,11 @@ const FileItem = ({
                         <div className="file-details">
                             <div className="file-name truncate" title={item.name}>
                                 {item.name}
+                                {tags && tags.length > 0 && (
+                                    <span className="file-tags" aria-label={tags.map(tg => tg.name).join(', ')}>
+                                        {tags.map(tg => <span key={`${tg.color}-${tg.name}`} className={`tag-dot tag-color-${tg.color}`} title={tg.name} />)}
+                                    </span>
+                                )}
                             </div>
                             <div className="file-info truncate">
                                 {size} • {modified}
@@ -158,6 +169,11 @@ const FileItem = ({
 
                             <div className="file-name truncate" title={item.name}>
                                 {item.name}
+                                {tags && tags.length > 0 && (
+                                    <span className="file-tags" aria-label={tags.map(tg => tg.name).join(', ')}>
+                                        {tags.map(tg => <span key={`${tg.color}-${tg.name}`} className={`tag-dot tag-color-${tg.color}`} title={tg.name} />)}
+                                    </span>
+                                )}
                             </div>
                         </div>
 

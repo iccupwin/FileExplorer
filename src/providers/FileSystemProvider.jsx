@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import * as fileOps from '../services/fileOps';
 import { useHistory } from './HistoryProvider';
 import { useSettings } from './SettingsProvider';
 import { useSftp } from './SftpProvider';
@@ -121,6 +122,22 @@ export default function FileSystemProvider({ children }) {
                 } else {
                     throw new Error(t('Failed to load SFTP directory'));
                 }
+            }
+
+            // Virtual locations: Recents and colour tags (macOS Spotlight / Finder tags)
+            if (path.startsWith('explr://')) {
+                let json;
+                if (path === 'explr://recents') {
+                    json = await invoke('list_recents', { limit: 200 });
+                } else if (path.startsWith('explr://tag/')) {
+                    json = await invoke('files_with_tag_color', { color: Number(path.slice('explr://tag/'.length)) || 0 });
+                } else {
+                    throw new Error(`Unknown location: ${path}`);
+                }
+                setCurrentDirData(filterDirectoryData(JSON.parse(json)));
+                lastLoadedPathRef.current = path;
+                navigateTo(path);
+                return true;
             }
 
             // Regular file system path
@@ -322,6 +339,7 @@ export default function FileSystemProvider({ children }) {
                     folderPathAbs: folderPath,
                     fileName: fileName
                 });
+                fileOps.recordCreated(`${folderPath.replace(/\/$/, '')}/${fileName}`);
                 await loadDirectory(folderPath);
             }
         } catch (err) {
@@ -348,6 +366,7 @@ export default function FileSystemProvider({ children }) {
                     folderPathAbs: folderPath,
                     folderName: directoryName
                 });
+                fileOps.recordCreated(`${folderPath.replace(/\/$/, '')}/${directoryName}`);
                 await loadDirectory(folderPath);
             }
         } catch (err) {
@@ -377,7 +396,7 @@ export default function FileSystemProvider({ children }) {
                     }
                 }
             } else {
-                await invoke('rename', { oldPath, newPath });
+                await fileOps.rename(oldPath, newPath); // undoable with Cmd+Z
                 const dirPath = getDirectoryPath(oldPath);
                 await loadDirectory(dirPath);
             }
@@ -408,9 +427,7 @@ export default function FileSystemProvider({ children }) {
                     setSelectedItems(prev => prev.filter(item => !item.path.startsWith(path)));
                 }
             } else {
-                await invoke('move_to_trash', { path });
-                const dirPath = path.substring(0, path.lastIndexOf('/'));
-                await loadDirectory(dirPath);
+                await fileOps.trash([path]); // undoable with Cmd+Z; refresh happens via fileOps
                 // Clear selection if the deleted item was selected
                 setSelectedItems(prev => prev.filter(item => !item.path.startsWith(path)));
             }

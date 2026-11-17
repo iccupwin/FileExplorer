@@ -98,7 +98,7 @@
       "frameworks": [],
       "providerShortName": null,
       "signingIdentity": null,
-      "entitlements": "src-tauri/entitlements.plist"
+      "entitlements": "entitlements.plist"
     }
   }
 }

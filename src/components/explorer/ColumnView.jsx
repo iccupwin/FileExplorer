@@ -144,10 +144,13 @@ const ColumnView = () => {
                         if (parentItem) select(parentItem);
                     });
                 }
-            } else if ((e.key === 'ArrowRight' || e.key === 'Enter') && current) {
+            } else if (e.key === 'ArrowRight' && current && isDir(current)) {
                 e.preventDefault();
-                if (isDir(current)) loadDirectory(current.path);
-                else if (e.key === 'Enter') openFile(current.path);
+                loadDirectory(current.path);
+            } else if (e.key === 'Enter' && current) {
+                // Return renames, like Finder
+                e.preventDefault();
+                document.dispatchEvent(new CustomEvent('open-rename-modal', { detail: { item: current } }));
             }
         };
         window.addEventListener('keydown', onKeyDown);

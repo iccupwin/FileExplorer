@@ -10,7 +10,7 @@ mod state;
 
 use crate::commands::{
     command_exec_commands, file_system_operation_commands, hash_commands, meta_data_commands,
-    search_engine_commands, settings_commands, template_commands, volume_operations_commands, sftp_file_system_operation_commands, preview_commands, permission_commands, thumbnail_commands, spotlight_commands, watch_commands, transfer_commands
+    search_engine_commands, settings_commands, template_commands, volume_operations_commands, sftp_file_system_operation_commands, preview_commands, permission_commands, thumbnail_commands, spotlight_commands, watch_commands, transfer_commands, locale_commands, macos_commands
 };
 use tauri::ipc::Invoke;
 use tauri::Manager;
@@ -102,9 +102,28 @@ fn all_commands() -> fn(Invoke) -> bool {
 
         // Live folder refresh
         watch_commands::watch_directory,
+        locale_commands::preferred_languages,
 
-        // Drag and drop
+        // Drag and drop / copy / move with progress
         transfer_commands::transfer_items,
+        transfer_commands::cancel_transfer,
+        transfer_commands::check_conflicts,
+
+        // macOS integrations (Trash + undo, Quick Look, tags, Recents, Open With, AirDrop)
+        macos_commands::trash_items,
+        macos_commands::restore_items,
+        macos_commands::quick_look,
+        macos_commands::quick_look_close,
+        macos_commands::quick_look_is_open,
+        macos_commands::get_tags,
+        macos_commands::set_tag,
+        macos_commands::files_with_tag_color,
+        macos_commands::list_recents,
+        macos_commands::open_with_apps,
+        macos_commands::open_with,
+        macos_commands::reveal_in_finder,
+        macos_commands::open_terminal_here,
+        macos_commands::share_airdrop,
     ]
 }
 

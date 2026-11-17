@@ -9,6 +9,7 @@ import menus from './ru/menus';
 import places from './ru/places';
 import settings from './ru/settings';
 import fileTypes from './ru/fileTypes';
+import features from './ru/features';
 
 export default {
     ...explorer,
@@ -17,5 +18,6 @@ export default {
     ...places,
     ...settings,
     ...fileTypes,
+    ...features,
     ...common,
 };

@@ -141,6 +141,12 @@ export const sortFilterActions = {
     clearFilters() {
         setState({ kindFilter: 'all', dateFilter: 'any' });
     },
+    /** Applies a saved per-folder sort without the "same key flips direction" behaviour. */
+    setSort(sortKey, direction) {
+        if (!SORT_OPTIONS.some((o) => o.key === sortKey)) return;
+        if (state.sortKey === sortKey && state.direction === direction) return;
+        setState({ sortKey, direction: direction === 'desc' ? 'desc' : 'asc' });
+    },
     setIconSize(size) {
         const clamped = Math.max(ICON_SIZE_MIN, Math.min(ICON_SIZE_MAX, Math.round(Number(size) || 64)));
         setState({ iconSize: clamped });

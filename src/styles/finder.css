@@ -846,3 +846,100 @@ button:focus:not(:focus-visible) {
     content-visibility: auto;
     contain-intrinsic-size: auto 24px;
 }
+
+/* Virtualized (very large) folders: uniform rows so geometry can be computed */
+.main-layout .file-list.virtual.view-mode-grid {
+    grid-auto-rows: calc(var(--icon-size, 64px) + 58px);
+}
+
+.main-layout .file-list.virtual.view-mode-grid > .file-item {
+    height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.main-layout .file-list.virtual > .file-item {
+    content-visibility: visible;
+}
+
+/* Rows that aren't rendered are replaced by extra padding */
+.main-layout .file-list.virtual.view-mode-grid {
+    padding-top: calc(14px + var(--vtop, 0px));
+    padding-bottom: calc(24px + var(--vbottom, 0px));
+}
+
+.main-layout .file-list.virtual.view-mode-list,
+.main-layout .file-list.virtual.view-mode-details {
+    padding-top: calc(4px + var(--vtop, 0px));
+    padding-bottom: calc(16px + var(--vbottom, 0px));
+}
+
+/* The list container is the only scrolling element (the list itself grows) */
+.main-layout .file-list-container > .file-list {
+    overflow: visible;
+    height: auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Sidebar: Recents, AirDrop, tag colours                              */
+/* ------------------------------------------------------------------ */
+.icon-recents {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230a84ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
+}
+
+.icon-airdrop {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230a84ff' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M5.6 17.4a9 9 0 1 1 12.8 0'/%3E%3Cpath d='M8.5 14.5a5 5 0 1 1 7 0'/%3E%3Cpath d='M12 13v8'/%3E%3C/svg%3E");
+}
+
+.main-layout .sidebar-item-icon.icon-tag-dot {
+    width: 10px;
+    height: 10px;
+    margin: 3px 11px 3px 3px;
+    border-radius: 50%;
+    background-image: none;
+}
+
+.tag-color-1 { background-color: #98989d; }
+.tag-color-2 { background-color: #30d158; }
+.tag-color-3 { background-color: #bf5af2; }
+.tag-color-4 { background-color: #0a84ff; }
+.tag-color-5 { background-color: #ffd60a; }
+.tag-color-6 { background-color: #ff453a; }
+.tag-color-7 { background-color: #ff9f0a; }
+
+/* Tag dots next to file names */
+.file-tags {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+.file-tags .tag-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--background);
+}
+
+.main-layout .sidebar-section[data-drop-favorites].drop-target {
+    background: var(--finder-sidebar-item-active);
+    border-radius: 6px;
+}
+
+.context-menu-icon.icon-tag-dot {
+    width: 10px !important;
+    height: 10px !important;
+    min-width: 10px;
+    margin: 0 5px 0 3px;
+    border-radius: 50%;
+    background-image: none !important;
+}
+
+/* Coloured icons keep their colours in dark mode (other icons are inverted there) */
+.icon.icon-recents,
+.icon.icon-airdrop,
+.icon.icon-tag-dot,
+.context-menu-icon.icon-tag-dot {
+    filter: none !important;
+}

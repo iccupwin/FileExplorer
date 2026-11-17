@@ -22,19 +22,28 @@ import ViewModes from '../components/explorer/ViewModes';
 // Additional Components
 import CreateFileButton from '../components/explorer/CreateFileButton';
 import RenameModal from '../components/common/RenameModal';
-import Terminal from '../components/terminal/Terminal';
+// Loaded on first use (keeps startup JS small)
+const Terminal = React.lazy(() => import('../components/terminal/Terminal'));
 import TabManager from '../components/tabs/TabManager';
-import GlobalSearch from '../components/search/GlobalSearch';
-import SettingsPanel from '../components/settings/SettingsPanel';
+// Loaded on first use (keeps startup JS small)
+const GlobalSearch = React.lazy(() => import('../components/search/GlobalSearch'));
+// Loaded on first use (keeps startup JS small)
+const SettingsPanel = React.lazy(() => import('../components/settings/SettingsPanel'));
 import ThisPCView from '../components/thisPc/ThisPCView';
-import NetworkView from '../components/network/NetworkView';
-import TemplateList from '../components/templates/TemplateList';
-import PreviewModal from '../components/preview/PreviewModal';
+// Loaded on first use (keeps startup JS small)
+const NetworkView = React.lazy(() => import('../components/network/NetworkView'));
+// Loaded on first use (keeps startup JS small)
+const TemplateList = React.lazy(() => import('../components/templates/TemplateList'));
+// Loaded on first use (keeps startup JS small)
+const PreviewModal = React.lazy(() => import('../components/preview/PreviewModal'));
 
 // Hash Modals
-import HashFileModal from '../components/common/HashFileModal.jsx';
-import HashCompareModal from '../components/common/HashCompareModal.jsx';
-import HashDisplayModal from '../components/common/HashDisplayModal.jsx';
+// Loaded on first use (keeps startup JS small)
+const HashFileModal = React.lazy(() => import('../components/common/HashFileModal.jsx'));
+// Loaded on first use (keeps startup JS small)
+const HashCompareModal = React.lazy(() => import('../components/common/HashCompareModal.jsx'));
+// Loaded on first use (keeps startup JS small)
+const HashDisplayModal = React.lazy(() => import('../components/common/HashDisplayModal.jsx'));
 
 // Settings Applier
 import SettingsApplier from '../utils/SettingsApplier.js';
@@ -47,6 +56,11 @@ import {replaceFileName} from "../utils/pathUtils.js";
 import SortFilterMenu from '../components/explorer/SortFilterMenu';
 import ColumnView from '../components/explorer/ColumnView';
 import useFileDragDrop from '../hooks/useFileDragDrop';
+import * as fileOps from '../services/fileOps';
+import useQuickLook from '../hooks/useQuickLook';
+import { getFolderView, saveFolderView } from '../services/folderViews';
+import useSortFilter, { sortFilterActions } from '../hooks/useSortFilter';
+import { ProgressPanel, ConflictDialog } from '../components/fileops/FileOpsUI';
 
 /**
  * MainLayout component that serves as the primary layout structure for the application.
@@ -74,6 +88,12 @@ const MainLayout = () => {
     } = useContextMenu();
     const { currentPath, navigateTo, goBack, goForward } = useHistory();
 
+    // File operations (undo, progress) refresh the view and report errors here
+    useEffect(() => {
+        fileOps.setRefreshHandler(() => refreshDirectory?.());
+        fileOps.setErrorHandler((message) => showError(message));
+    }, [refreshDirectory]);
+
     // Drop files onto folders, the sidebar or the open folder (from Finder or Explr)
     useFileDragDrop({
         currentPath,
@@ -89,6 +109,24 @@ const MainLayout = () => {
     const [searchValue, setSearchValue] = useState('');
     const [searchResults, setSearchResults] = useState(null);
     const [currentView, setCurrentView] = useState('explorer'); // 'explorer', 'this-pc', 'templates'
+
+    // Per-folder view and sort (like Finder): restore when the folder changes...
+    const currentPathRef = React.useRef(currentPath);
+    currentPathRef.current = currentPath;
+    useEffect(() => {
+        const saved = getFolderView(currentPath);
+        if (saved?.viewMode) setViewMode(saved.viewMode);
+        if (saved?.sortKey) sortFilterActions.setSort(saved.sortKey, saved.direction);
+    }, [currentPath]);
+    // ...and remember sort changes for the open folder
+    const { sortKey: folderSortKey, direction: folderSortDirection } = useSortFilter();
+    useEffect(() => {
+        saveFolderView(currentPathRef.current, { sortKey: folderSortKey, direction: folderSortDirection });
+    }, [folderSortKey, folderSortDirection]);
+
+    // Space: system Quick Look for the selection (macOS)
+    useQuickLook({ selectedItems, focusedItem, enabled: currentView === 'explorer' });
+
 
     // Modal states
     const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
@@ -671,6 +709,7 @@ const MainLayout = () => {
      */
     const handleViewModeChange = useCallback(async (newMode) => {
         setViewMode(newMode);
+        saveFolderView(currentPathRef.current, { viewMode: newMode }); // remembered per folder
 
         // Save to settings
         try {
@@ -737,23 +776,30 @@ const MainLayout = () => {
 
             if (!e.shiftKey && !e.altKey && key === 'c' && items.length) { handled(); s.copyToClipboard(items); return; }
             if (!e.shiftKey && !e.altKey && key === 'x' && items.length) { handled(); s.cutToClipboard(items); return; }
-            if (!e.shiftKey && key === 'v') { handled(); await s.pasteFromClipboard(); s.refreshDirectory?.(); return; }
-            // Move to Trash: Cmd+Backspace (recoverable from the Trash, like Finder)
+            // Undo last file operation: Cmd+Z
+            if (!e.shiftKey && key === 'z') {
+                handled();
+                if (!(await fileOps.undo())) showError(t('Nothing to undo'));
+                return;
+            }
+            // Paste (copy), or Cmd+Option+V: move items here (like Finder)
+            if (!e.shiftKey && key === 'v') { handled(); await s.pasteFromClipboard(e.altKey === true); return; }
+            // Move to Trash: Cmd+Backspace (Cmd+Z puts it back)
             if (key === 'Backspace' && items.length) {
                 handled();
-                for (const item of items) {
-                    try { await s.moveToTrash(item.path); } catch (err) { showError(t('Could not move "{name}" to Trash: {error}', { name: item.name, error: err })); }
+                const remote = items.filter(i => !i.path.startsWith('/'));
+                if (remote.length) {
+                    for (const item of remote) {
+                        try { await s.moveToTrash(item.path); } catch (err) { showError(t('Could not move "{name}" to Trash: {error}', { name: item.name, error: err })); }
+                    }
                 }
-                s.refreshDirectory?.();
+                await fileOps.trash(items.filter(i => i.path.startsWith('/')).map(i => i.path));
                 return;
             }
             // Duplicate: Cmd+D
             if (!e.shiftKey && key === 'd' && items.length && isLocal) {
                 handled();
-                try {
-                    await invoke('transfer_items', { paths: items.map(i => i.path), targetDir: s.currentPath, mode: 'copy' });
-                    s.refreshDirectory?.();
-                } catch (err) { showError(String(err)); }
+                await fileOps.transfer(items.map(i => i.path), s.currentPath, { mode: 'copy' });
                 return;
             }
             // Get Info: Cmd+I
@@ -1030,7 +1076,7 @@ const MainLayout = () => {
                             className="main-content"
                             style={isTerminalOpen ? { paddingBottom: `${terminalHeight}px` } : {}}
                         >
-                            {renderMainContent()}
+                            <React.Suspense fallback={null}>{renderMainContent()}</React.Suspense>
 
                             {/* Details panel (when selected) */}
                             {isDetailsPanelOpen && (
@@ -1056,16 +1102,20 @@ const MainLayout = () => {
                                 overflow: isTerminalOpen ? 'visible' : 'hidden'
                             }}
                         >
-                            {isTerminalOpen && (
+                            <React.Suspense fallback={null}>{isTerminalOpen && (
                                 <Terminal
                                     isOpen={isTerminalOpen}
                                     onToggle={() => setIsTerminalOpen(!isTerminalOpen)}
                                 />
-                            )}
+                            )}</React.Suspense>
                         </div>
                     </div>
                 </div>
             </TabManager>
+
+            {/* Copy/move progress and name-conflict dialog */}
+            <ProgressPanel />
+            <ConflictDialog />
 
             {/* Context menu */}
             {isContextMenuOpen && (
@@ -1076,16 +1126,21 @@ const MainLayout = () => {
                 />
             )}
 
-            {/* Modals */}
+            {/* Modals (lazy: only loaded and mounted while open) */}
+            <React.Suspense fallback={null}>
+            {isGlobalSearchOpen && (
             <GlobalSearch
                 isOpen={isGlobalSearchOpen}
                 onClose={() => setIsGlobalSearchOpen(false)}
             />
+            )}
 
+            {isSettingsOpen && (
             <SettingsPanel
                 isOpen={isSettingsOpen}
                 onClose={() => setIsSettingsOpen(false)}
             />
+            )}
 
             <RenameModal
                 isOpen={isRenameModalOpen}
@@ -1095,6 +1150,7 @@ const MainLayout = () => {
             />
 
             {/* Hash Modals - with debug info */}
+            {isHashFileModalOpen && (
             <HashFileModal
                 isOpen={isHashFileModalOpen}
                 onClose={() => {
@@ -1104,7 +1160,9 @@ const MainLayout = () => {
                 }}
                 item={hashModalItem}
             />
+            )}
 
+            {isHashCompareModalOpen && (
             <HashCompareModal
                 isOpen={isHashCompareModalOpen}
                 onClose={() => {
@@ -1114,7 +1172,9 @@ const MainLayout = () => {
                 }}
                 item={hashModalItem}
             />
+            )}
 
+            {isHashDisplayModalOpen && (
             <HashDisplayModal
                 isOpen={isHashDisplayModalOpen}
                 onClose={() => {
@@ -1125,6 +1185,7 @@ const MainLayout = () => {
                 hash={hashDisplayData.hash}
                 fileName={hashDisplayData.fileName}
             />
+            )}
 
             {/* Preview Modal */}
             {(isPreviewOpen || isPreviewLoading) && (
@@ -1134,6 +1195,7 @@ const MainLayout = () => {
                     isLoading={isPreviewLoading}
                 />
             )}
+            </React.Suspense>
         </div>
     );
 };
